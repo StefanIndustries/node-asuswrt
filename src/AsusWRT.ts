@@ -139,4 +139,29 @@ export class AsusWRT {
         });
         return wiredClients;
     }
+
+    public async getWirelessClients(routerMac: string, band: '2G' | '5G'): Promise<AsusWRTConnectedDevice[]> {
+        let wirelessClients: AsusWRTConnectedDevice[] = [];
+        const allClientsData = await this.appGet('get_clientlist()');
+        const wirelessClientsData = await this.appGet('get_wclientlist()');
+        if (!wirelessClientsData.get_wclientlist[routerMac][band]) {
+            return wirelessClients;
+        }
+        wirelessClientsData.get_wclientlist[routerMac][band].forEach((mac: string) => {
+            if (allClientsData.get_clientlist.maclist.includes(mac)) {
+                const device = allClientsData.get_clientlist[mac];
+                wirelessClients.push(<AsusWRTConnectedDevice> {
+                    ip: device.ip,
+                    mac: device.mac,
+                    name: device.name,
+                    nickName: device.nickName,
+                    dpiDevice: device.dpiDevice,
+                    vendor: device.vendor,
+                    ipMethod: device.ipMethod,
+                    rssi: device.rssi !== "" ? parseInt(device.rssi) : 0
+                });
+            }
+        });
+        return wirelessClients;
+    }
 }
