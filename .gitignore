@@ -3,6 +3,9 @@
 .idea/
 .idea/*
 
+# Compiled code
+lib
+
 # Logs
 logs
 *.log
