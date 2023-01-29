@@ -6,6 +6,9 @@
 # Compiled code
 lib
 
+# Test code
+testprogram.mjs
+
 # Logs
 logs
 *.log
