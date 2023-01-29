@@ -5,6 +5,15 @@
     "build": "tsc",
     "lint": "eslint . --ext .ts"
   },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/StefanIndustries/node-asuswrt.git"
+  },
+  "license": "GNU GENERAL PUBLIC LICENSE",
+  "bugs": {
+    "url": "https://github.com/StefanIndustries/node-asuswrt/issues"
+  },
+  "homepage": "https://github.com/StefanIndustries/node-asuswrt",
   "dependencies": {
     "axios": "^1.2.6"
   },
