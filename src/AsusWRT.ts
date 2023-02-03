@@ -8,7 +8,7 @@ export class AsusWRT {
     private axiosInstance: AxiosInstance;
     private abortController = new AbortController();
 
-    constructor(baseUrl: string, private username: string, private password: string) {
+    constructor(baseUrl: string, private username: string, private password: string, debug?: boolean) {
         this.axiosInstance = axios.create({
             baseURL: baseUrl,
             timeout: 10000,
@@ -25,6 +25,20 @@ export class AsusWRT {
             }
             return request;
         });
+
+        if (debug) {
+            this.axiosInstance.interceptors.request.use(async (request) => {
+                console.log("url", request.url);
+                console.log("data", request.data);
+                return request;
+            });
+
+            this.axiosInstance.interceptors.response.use(async (response) => {
+                console.log("response status", response.status);
+                console.log("response data", response.data);
+                return response;
+            });
+        }
 
         this.axiosInstance.interceptors.response.use(
             config => config,
@@ -43,6 +57,32 @@ export class AsusWRT {
             return true;
         }
         return (Date.now() - this.loginSessionStart) > 10 * 60 * 1000;
+    }
+
+    private async appGet(payload: string): Promise<any> {
+        const path = '/appGet.cgi';
+        const result = await this.axiosInstance({
+            method: 'POST',
+            url: path,
+            data: new URLSearchParams({
+                hook: payload
+            }),
+            headers: {
+                'Content-Type': 'application/x-www-form-urlencoded'
+            },
+            signal: this.abortController.signal
+        });
+        return result.data;
+    }
+
+    private async applyApp(payload: string): Promise<boolean> {
+        const path = '/applyapp.cgi';
+        const result = await this.axiosInstance({
+            method: 'GET',
+            url: `${path}?${payload}`,
+            signal: this.abortController.signal
+        });
+        return result.status === 200
     }
 
     public async login(): Promise<boolean> {
@@ -64,36 +104,6 @@ export class AsusWRT {
         this.axiosInstance.defaults.headers.common['Cookie'] = `asus_token=${result.data.asus_token}`;
         this.loginSessionStart = Date.now();
         return true;
-    }
-
-    private async appGet(payload: string): Promise<any> {
-        const path = '/appGet.cgi';
-        const result = await this.axiosInstance({
-            method: 'POST',
-            url: path,
-            data: new URLSearchParams({
-                hook: payload
-            }),
-            headers: {
-                'Content-Type': 'application/x-www-form-urlencoded'
-            },
-            signal: this.abortController.signal
-        });
-        return result.data;
-    }
-
-    private async applyApp(payload: any): Promise<any> {
-        const path = '/applyapp.cgi';
-        const result = await this.axiosInstance({
-            method: 'POST',
-            url: path,
-            data: payload,
-            headers: {
-                'Content-Type': 'application/x-www-form-urlencoded'
-            },
-            signal: this.abortController.signal
-        });
-        return result.data;
     }
 
     public dispose() {
@@ -163,5 +173,13 @@ export class AsusWRT {
             }
         });
         return wirelessClients;
+    }
+
+    public async setLedsEnabled(routerMac: string, enabled: boolean): Promise<boolean> {
+        return await this.applyApp(`config={"led_val":${enabled ? 1 : 0}}&re_mac=${routerMac}&action_mode=config_changed`);
+    }
+
+    public async rebootNetwork(): Promise<boolean> {
+        return await this.applyApp(`action_mode=device_reboot`);
     }
 }
