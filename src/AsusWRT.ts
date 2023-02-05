@@ -1,30 +1,26 @@
-import axios, {AxiosInstance} from "axios";
+import axios, {AxiosInstance, AxiosRequestConfig} from "axios";
 import {AsusWRTRouter} from "./models/AsusWRTRouter";
 import {AsusWRTOperationMode} from "./models/AsusWRTOperationMode";
 import {AsusWRTConnectedDevice} from "./models/AsusWRTConnectedDevice";
+import {AsusWRTTokenProvider} from "./AsusWRTTokenProvider";
+import {AsusWRTLoad} from "./models/AsusWRTLoad";
+import {AsusWRTWANStatus} from "./models/AsusWRTWANStatus";
+import {AsusWRTTrafficData} from "./models/AsusWRTTrafficData";
 
 export class AsusWRT {
-    private loginSessionStart: number | null = null;
     private axiosInstance: AxiosInstance;
     private abortController = new AbortController();
+    private asusTokenProvider: AsusWRTTokenProvider;
+    private macIpBinding = new Map<string, string>();
 
     constructor(baseUrl: string, private username: string, private password: string, debug?: boolean) {
         this.axiosInstance = axios.create({
             baseURL: baseUrl,
             timeout: 10000,
             headers: { 'User-Agent': 'asusrouter-Android-DUTUtil-1.0.0.3.58-163' }
-        })
-
-        this.axiosInstance.interceptors.request.use(async (request) => {
-            if (request.url !== '/login.cgi' && (!this.isLoggedIn() || this.isSessionOlderThan10Minutes())) {
-                const newToken = await this.login().catch(error => Promise.reject(error));
-                const originalRequestConfig = request;
-                delete originalRequestConfig.headers!['Cookie'];
-                originalRequestConfig.headers!['Cookie'] = newToken;
-                return originalRequestConfig;
-            }
-            return request;
         });
+
+        this.asusTokenProvider = new AsusWRTTokenProvider(this.axiosInstance, username, password);
 
         if (debug) {
             this.axiosInstance.interceptors.request.use(async (request) => {
@@ -46,22 +42,17 @@ export class AsusWRT {
                 return Promise.reject(error);
             }
         );
+
+        this.getRouters().then(routers => {
+            routers.forEach(router => {
+                this.macIpBinding.set(router.mac, this.axiosInstance.defaults.baseURL!.includes('https://') ? `https://${router.ip}` : `http://${router.ip}`);
+            });
+        });
     }
 
-    private isLoggedIn(): boolean {
-        return this.loginSessionStart !== null;
-    }
-
-    private isSessionOlderThan10Minutes(): boolean {
-        if (!this.loginSessionStart) {
-            return true;
-        }
-        return (Date.now() - this.loginSessionStart) > 10 * 60 * 1000;
-    }
-
-    private async appGet(payload: string): Promise<any> {
+    private async appGet(payload: string, routerIP?: string): Promise<any> {
         const path = '/appGet.cgi';
-        const result = await this.axiosInstance({
+        const config: AxiosRequestConfig = {
             method: 'POST',
             url: path,
             data: new URLSearchParams({
@@ -71,43 +62,31 @@ export class AsusWRT {
                 'Content-Type': 'application/x-www-form-urlencoded'
             },
             signal: this.abortController.signal
-        });
+        };
+        if (routerIP) {
+            config.baseURL = routerIP;
+        }
+        const result = await this.axiosInstance(config);
         return result.data;
     }
 
-    private async applyApp(payload: string): Promise<boolean> {
+    private async applyApp(payload: string, routerIP?: string): Promise<boolean> {
         const path = '/applyapp.cgi';
-        const result = await this.axiosInstance({
+        const config: AxiosRequestConfig = {
             method: 'GET',
             url: `${path}?${payload}`,
             signal: this.abortController.signal
-        });
-        return result.status === 200
-    }
-
-    public async login(): Promise<boolean> {
-        const path = '/login.cgi';
-        const result = await this.axiosInstance({
-            method: 'POST',
-            url: path,
-            data: new URLSearchParams({
-                login_authorization: Buffer.from(`${this.username}:${this.password}`).toString('base64')
-            }),
-            headers: {
-                'Content-Type': 'application/x-www-form-urlencoded',
-            },
-            signal: this.abortController.signal
-        });
-        if (!result.data.asus_token) {
-            return Promise.reject(false);
+        };
+        if (routerIP) {
+            config.baseURL = routerIP;
         }
-        this.axiosInstance.defaults.headers.common['Cookie'] = `asus_token=${result.data.asus_token}`;
-        this.loginSessionStart = Date.now();
-        return true;
+        const result = await this.axiosInstance(config);
+        return result.status === 200
     }
 
     public dispose() {
         this.abortController.abort();
+        this.asusTokenProvider.disposeCache();
     }
 
     public async getRouters(): Promise<AsusWRTRouter[]> {
@@ -180,6 +159,82 @@ export class AsusWRT {
     }
 
     public async rebootNetwork(): Promise<boolean> {
-        return await this.applyApp(`action_mode=device_reboot`);
+        const result = await this.applyApp(`action_mode=device_reboot`);
+        if (result) {
+            this.asusTokenProvider.disposeCache();
+        }
+        return result;
+    }
+
+    public async getCPUMemoryLoad(routerMac: string): Promise<AsusWRTLoad> {
+        const cpuMemoryData = await this.appGet(`cpu_usage(appobj);memory_usage(appobj)`, this.macIpBinding.get(routerMac));
+        return {
+            CPUUsagePercentage: this.getCPUUsagePercentage(cpuMemoryData.cpu_usage),
+            MemoryUsagePercentage: this.getMemoryUsagePercentage(cpuMemoryData.memory_usage)
+        };
+    }
+
+    public async getTotalTrafficData(): Promise<AsusWRTTrafficData> {
+        const trafficData = await this.appGet('netdev(appobj)');
+        const trafficReceived = (parseInt(trafficData['netdev']['INTERNET_rx'], 16) * 8 / 1024 / 1024) * 0.125;
+        const trafficSent = (parseInt(trafficData['netdev']['INTERNET_tx'], 16) * 8 / 1024 / 1024) * 0.125;
+        return {
+            trafficReceived: trafficReceived,
+            trafficSent: trafficSent
+        };
+    }
+
+    public async getWANStatus(): Promise<AsusWRTWANStatus> {
+        let status: any = {};
+        const wanData = <string> await this.appGet('wanlink()');
+        wanData.split('\n').forEach(line => {
+            if (line.includes('return') && line.includes('wanlink_')) {
+                const key = line.substring(line.indexOf('_') + 1, line.indexOf('('));
+                let value = line.substring(line.indexOf('return ') + 7, line.indexOf(';}'));
+                if (value.includes(`'`)) {
+                    status[key] = value.substring(1, value.length - 1);
+                } else {
+                    status[key] = parseInt(value);
+                }
+            }
+        });
+        return <AsusWRTWANStatus> status;
+    }
+
+    public async getUptime(routerMac: string): Promise<number> {
+        const uptimeData = await this.appGet('uptime()', this.macIpBinding.get(routerMac));
+        if (uptimeData && typeof uptimeData === 'string') {
+            let uptimeSeconds = uptimeData.substring(uptimeData.indexOf(':'));
+            uptimeSeconds = uptimeSeconds.substring(uptimeSeconds.indexOf("(") + 1);
+            uptimeSeconds = uptimeSeconds.substring(0, uptimeSeconds.indexOf(" "));
+            return parseInt(uptimeSeconds);
+        } else {
+            return 0;
+        }
+    }
+
+    private getCPUUsagePercentage(cpuUsageObj: any): number {
+        let totalAvailable = 0;
+        let totalUsed = 0;
+        for (let i = 1; i < 16; i++) {
+            totalAvailable += this.addNumberValueIfExists(cpuUsageObj, `cpu${i}_total`);
+        }
+        for (let i = 1; i < 16; i++) {
+            totalUsed += this.addNumberValueIfExists(cpuUsageObj, `cpu${i}_usage`);
+        }
+        return (100 / totalAvailable) * totalUsed;
+    }
+
+    private addNumberValueIfExists(object: any, property: string): number {
+        if (object[property]) {
+            return parseInt(object[property]);
+        }
+        return 0;
+    }
+
+    private getMemoryUsagePercentage(memoryUsageObj: any): number {
+        const totalMemory = parseInt(memoryUsageObj.mem_total);
+        const memUsed = parseInt(memoryUsageObj.mem_used);
+        return (100 / totalMemory) * memUsed;
     }
 }
