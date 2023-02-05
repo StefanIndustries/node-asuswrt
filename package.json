@@ -2,6 +2,8 @@
   "name": "node-asuswrt",
   "version": "1.0.8",
   "author": "Stefan Simon",
+  "main": "lib/AsusWRT.js",
+  "types": "lib/AsusWRT.d.ts",
   "scripts": {
     "build": "tsc",
     "lint": "eslint . --ext .ts"
