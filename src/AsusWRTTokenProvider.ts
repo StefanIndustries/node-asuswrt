@@ -1,5 +1,5 @@
 import {AsusWRTCache} from "./models/AsusWRTCache";
-import {AxiosInstance} from "axios";
+import axios, {AxiosInstance, InternalAxiosRequestConfig} from "axios";
 
 export class AsusWRTTokenProvider {
     private cacheDictionary = new Map<string, AsusWRTCache>();
@@ -9,21 +9,37 @@ export class AsusWRTTokenProvider {
                 return request;
             }
             const cache = this.cacheDictionary.get(<string> request.baseURL);
-            if (cache && (!this.isLoggedIn(cache) || this.isSessionOlderThan10Minutes(cache))) {
+            if (cache && this.isLoggedIn(cache)) {
                 delete request.headers!['Cookie'];
                 request.headers!['Cookie'] = `asus_token=${cache.Token}`
-            } else {
-                const newToken = await this.login(<string> request.baseURL)
-                this.cacheDictionary.set(<string> request.baseURL, <AsusWRTCache> {
-                    Token: newToken,
-                    TokenDate: Date.now(),
-                    RouterIP: request.baseURL
-                });
-                delete request.headers!['Cookie'];
-                request.headers!['Cookie'] = `asus_token=${newToken}`
             }
             return request;
         });
+
+        this.axiosInstance.interceptors.response.use(async (response) => {
+            if (response.config.url !== '/login.cgi' && response.data && response.data.error_status) {
+                return await this.setNewTokenInRequest(response.config);
+            }
+            return response;
+        }, async (error) => {
+            console.log('error, retrying');
+            if (error.response && error.response.status && error.response.status === 401 && !error.config.retry) {
+                return await this.setNewTokenInRequest(error.config);
+            }
+            return Promise.reject(error);
+        });
+    }
+
+    private async setNewTokenInRequest(originalRequest: InternalAxiosRequestConfig<any>) {
+        const newToken = await this.login(<string>originalRequest.baseURL);
+        this.cacheDictionary.set(<string>originalRequest.baseURL, <AsusWRTCache>{
+            Token: newToken,
+            TokenDate: Date.now(),
+            RouterIP: originalRequest.baseURL
+        });
+        delete originalRequest.headers!['Cookie'];
+        originalRequest.headers!['Cookie'] = `asus_token=${newToken}`;
+        return this.axiosInstance(originalRequest);
     }
 
     public disposeCache(): void {
@@ -31,14 +47,7 @@ export class AsusWRTTokenProvider {
     }
 
     private isLoggedIn(cache: AsusWRTCache): boolean {
-        return cache.TokenDate !== null;
-    }
-
-    private isSessionOlderThan10Minutes(cache: AsusWRTCache): boolean {
-        if (!cache.TokenDate) {
-            return true;
-        }
-        return (Date.now() - cache.TokenDate) > 10 * 60 * 1000;
+        return cache.Token !== '' && cache.TokenDate !== null;
     }
 
     private async login(baseUrl: string): Promise<string> {

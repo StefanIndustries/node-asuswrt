@@ -16,7 +16,7 @@ export class AsusWRT {
     constructor(baseUrl: string, private username: string, private password: string, debug?: boolean) {
         this.axiosInstance = axios.create({
             baseURL: baseUrl,
-            timeout: 10000,
+            timeout: 30000,
             headers: { 'User-Agent': 'asusrouter-Android-DUTUtil-1.0.0.3.58-163' }
         });
 
@@ -35,13 +35,6 @@ export class AsusWRT {
                 return response;
             });
         }
-
-        this.axiosInstance.interceptors.response.use(
-            config => config,
-            error => {
-                return Promise.reject(error);
-            }
-        );
 
         this.getRouters().then(routers => {
             routers.forEach(router => {
