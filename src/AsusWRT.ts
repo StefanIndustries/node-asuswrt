@@ -13,7 +13,7 @@ export class AsusWRT {
     private asusTokenProvider: AsusWRTTokenProvider;
     private macIpBinding = new Map<string, string>();
 
-    constructor(baseUrl: string, private username: string, private password: string, debug?: boolean) {
+    constructor(baseUrl: string, private username: string, private password: string, private debug?: boolean) {
         this.axiosInstance = axios.create({
             baseURL: baseUrl,
             timeout: 30000,
@@ -22,7 +22,7 @@ export class AsusWRT {
 
         this.asusTokenProvider = new AsusWRTTokenProvider(this.axiosInstance, username, password);
 
-        if (debug) {
+        if (this.debug) {
             this.axiosInstance.interceptors.request.use(async (request) => {
                 console.log("url", request.url);
                 console.log("data", request.data);
@@ -59,8 +59,13 @@ export class AsusWRT {
         if (routerIP) {
             config.baseURL = routerIP;
         }
-        const result = await this.axiosInstance(config);
-        return result.data;
+        const result = await this.axiosInstance(config).catch(err => {
+            if (this.debug) {
+                console.log(err);
+            }
+            return Promise.reject(err);
+        });
+        return result!.data;
     }
 
     private async applyApp(payload: string, routerIP?: string): Promise<boolean> {
@@ -73,7 +78,12 @@ export class AsusWRT {
         if (routerIP) {
             config.baseURL = routerIP;
         }
-        const result = await this.axiosInstance(config);
+        const result = await this.axiosInstance(config).catch(err => {
+            if (this.debug) {
+                console.log(err);
+            }
+            return Promise.reject(err);
+        })
         return result.status === 200
     }
 
@@ -102,11 +112,10 @@ export class AsusWRT {
 
     public async getWiredClients(routerMac: string): Promise<AsusWRTConnectedDevice[]> {
         let wiredClients: AsusWRTConnectedDevice[] = [];
-        const allClientsData = await this.appGet('get_clientlist()');
-        const wiredClientsData = await this.appGet('get_wiredclientlist()');
-        wiredClientsData.get_wiredclientlist[routerMac].forEach((mac: string) => {
-            if (allClientsData.get_clientlist.maclist.includes(mac)) {
-                const device = allClientsData.get_clientlist[mac];
+        const clientsData = await this.appGet('get_clientlist();get_wiredclientlist()');
+        clientsData.get_wiredclientlist[routerMac].forEach((mac: string) => {
+            if (clientsData.get_clientlist.maclist.includes(mac)) {
+                const device = clientsData.get_clientlist[mac];
                 wiredClients.push(<AsusWRTConnectedDevice> {
                     ip: device.ip,
                     mac: device.mac,
@@ -124,14 +133,13 @@ export class AsusWRT {
 
     public async getWirelessClients(routerMac: string, band: '2G' | '5G'): Promise<AsusWRTConnectedDevice[]> {
         let wirelessClients: AsusWRTConnectedDevice[] = [];
-        const allClientsData = await this.appGet('get_clientlist()');
-        const wirelessClientsData = await this.appGet('get_wclientlist()');
-        if (!wirelessClientsData.get_wclientlist[routerMac][band]) {
+        const clientsData = await this.appGet('get_clientlist();get_wclientlist()');
+        if (!clientsData.get_wclientlist[routerMac][band]) {
             return wirelessClients;
         }
-        wirelessClientsData.get_wclientlist[routerMac][band].forEach((mac: string) => {
-            if (allClientsData.get_clientlist.maclist.includes(mac)) {
-                const device = allClientsData.get_clientlist[mac];
+        clientsData.get_wclientlist[routerMac][band].forEach((mac: string) => {
+            if (clientsData.get_clientlist.maclist.includes(mac)) {
+                const device = clientsData.get_clientlist[mac];
                 wirelessClients.push(<AsusWRTConnectedDevice> {
                     ip: device.ip,
                     mac: device.mac,
