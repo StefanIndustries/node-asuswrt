@@ -1,6 +1,6 @@
 {
   "name": "node-asuswrt",
-  "version": "1.0.10",
+  "version": "1.0.11",
   "author": "Stefan Simon",
   "main": "lib/AsusWRT.js",
   "types": "lib/AsusWRT.d.ts",
