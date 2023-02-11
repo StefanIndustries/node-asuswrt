@@ -24,7 +24,7 @@ export class AsusWRT {
 
         if (this.debug) {
             this.axiosInstance.interceptors.request.use(async (request) => {
-                console.log("url", request.url);
+                console.log("url", request.baseURL! + request.url);
                 console.log("data", request.data);
                 return request;
             });
@@ -110,6 +110,26 @@ export class AsusWRT {
         });
     }
 
+    public async getAllClients(): Promise<AsusWRTConnectedDevice[]> {
+        let allClients: AsusWRTConnectedDevice[] = [];
+        const clientsData = await this.appGet('get_clientlist()');
+        clientsData.get_clientlist.maclist.forEach((macAddr: string) => {
+            const device = clientsData.get_clientlist[macAddr];
+            allClients.push(<AsusWRTConnectedDevice> {
+                ip: device.ip,
+                mac: device.mac,
+                name: device.name,
+                nickName: device.nickName,
+                dpiDevice: device.dpiDevice,
+                vendor: device.vendor,
+                ipMethod: device.ipMethod,
+                rssi: device.rssi !== "" ? parseInt(device.rssi) : 0,
+                online: device.isOnline && device.isOnline === '1'
+            });
+        });
+        return allClients;
+    }
+
     public async getWiredClients(routerMac: string): Promise<AsusWRTConnectedDevice[]> {
         let wiredClients: AsusWRTConnectedDevice[] = [];
         const clientsData = await this.appGet('get_clientlist();get_wiredclientlist()');
@@ -124,7 +144,8 @@ export class AsusWRT {
                     dpiDevice: device.dpiDevice,
                     vendor: device.vendor,
                     ipMethod: device.ipMethod,
-                    rssi: device.rssi !== "" ? parseInt(device.rssi) : 0
+                    rssi: device.rssi !== "" ? parseInt(device.rssi) : 0,
+                    online: device.isOnline && device.isOnline === '1'
                 });
             }
         });
@@ -148,7 +169,8 @@ export class AsusWRT {
                     dpiDevice: device.dpiDevice,
                     vendor: device.vendor,
                     ipMethod: device.ipMethod,
-                    rssi: device.rssi !== "" ? parseInt(device.rssi) : 0
+                    rssi: device.rssi !== "" ? parseInt(device.rssi) : 0,
+                    online: device.isOnline && device.isOnline === '1'
                 });
             }
         });

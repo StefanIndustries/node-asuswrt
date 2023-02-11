@@ -6,5 +6,6 @@ export interface AsusWRTConnectedDevice {
     dpiDevice: string,
     vendor: string,
     ipMethod: string,
-    rssi: number
+    rssi: number,
+    online: boolean
 }
