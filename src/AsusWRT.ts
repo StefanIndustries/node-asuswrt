@@ -6,6 +6,7 @@ import {AsusWRTTokenProvider} from "./AsusWRTTokenProvider";
 import {AsusWRTLoad} from "./models/AsusWRTLoad";
 import {AsusWRTWANStatus} from "./models/AsusWRTWANStatus";
 import {AsusWRTTrafficData} from "./models/AsusWRTTrafficData";
+import {AsusWRTWakeOnLanDevice} from "./models/AsusWRTWakeOnLanDevice";
 
 export class AsusWRT {
     private axiosInstance: AxiosInstance;
@@ -54,11 +55,9 @@ export class AsusWRT {
             headers: {
                 'Content-Type': 'application/x-www-form-urlencoded'
             },
+            baseURL: routerIP ? routerIP : this.axiosInstance.defaults.baseURL,
             signal: this.abortController.signal
         };
-        if (routerIP) {
-            config.baseURL = routerIP;
-        }
         const result = await this.axiosInstance(config).catch(err => {
             if (this.debug) {
                 console.log(err);
@@ -68,16 +67,35 @@ export class AsusWRT {
         return result!.data;
     }
 
-    private async applyApp(payload: string, routerIP?: string): Promise<boolean> {
+    private async applyAppGET(payload: string, routerIP?: string): Promise<boolean> {
         const path = '/applyapp.cgi';
         const config: AxiosRequestConfig = {
             method: 'GET',
             url: `${path}?${payload}`,
+            baseURL: routerIP ? routerIP : this.axiosInstance.defaults.baseURL,
             signal: this.abortController.signal
         };
-        if (routerIP) {
-            config.baseURL = routerIP;
-        }
+        const result = await this.axiosInstance(config).catch(err => {
+            if (this.debug) {
+                console.log(err);
+            }
+            return Promise.reject(err);
+        })
+        return result.status === 200
+    }
+
+    private async applyAppPOST(payload: any, routerIP?: string): Promise<boolean> {
+        const path = '/applyapp.cgi';
+        const config: AxiosRequestConfig = {
+            method: 'POST',
+            url: `${path}`,
+            data: new URLSearchParams(payload),
+            headers: {
+                'Content-Type': 'application/x-www-form-urlencoded',
+            },
+            baseURL: routerIP ? routerIP : this.axiosInstance.defaults.baseURL,
+            signal: this.abortController.signal
+        };
         const result = await this.axiosInstance(config).catch(err => {
             if (this.debug) {
                 console.log(err);
@@ -177,12 +195,39 @@ export class AsusWRT {
         return wirelessClients;
     }
 
+    public async getWakeOnLanList(): Promise<AsusWRTWakeOnLanDevice[]> {
+        let wolClients: AsusWRTWakeOnLanDevice[] = [];
+        const wolClientsData = await this.appGet('nvram_get(wollist);');
+        const wollistUnsplitted = wolClientsData.wollist;
+        const wollistSplitted =  wollistUnsplitted.split('&#60');
+        if (wollistSplitted.length > 0) {
+            wollistSplitted.forEach((item: any) => {
+                if (item.indexOf('&#62') > 0) {
+                    const splittedItem = item.split('&#62');
+                    wolClients.push({
+                        name: splittedItem[0],
+                        mac: splittedItem[1]
+                    });
+                }
+            });
+        }
+        return wolClients;
+    }
+
     public async setLedsEnabled(routerMac: string, enabled: boolean): Promise<boolean> {
-        return await this.applyApp(`config={"led_val":${enabled ? 1 : 0}}&re_mac=${routerMac}&action_mode=config_changed`);
+        return await this.applyAppGET(`config={"led_val":${enabled ? 1 : 0}}&re_mac=${routerMac}&action_mode=config_changed`);
+    }
+
+    public async wakeOnLan(deviceMac: string): Promise<boolean> {
+        return await this.applyAppPOST({
+            current_page: "Main_WOL_Content.asp",
+            SystemCmd: `ether-wake -i br0 ${deviceMac}`,
+            action_mode: " Refresh "
+        });
     }
 
     public async rebootNetwork(): Promise<boolean> {
-        const result = await this.applyApp(`action_mode=device_reboot`);
+        const result = await this.applyAppGET(`action_mode=device_reboot`);
         if (result) {
             this.asusTokenProvider.disposeCache();
         }

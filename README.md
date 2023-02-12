@@ -100,6 +100,16 @@ asus.getTotalTrafficData()
 asus.getWANStatus()
 ```
 
+### Get Wake On Lan Devices (async)
+```typescript
+asus.getWakeOnLanList()
+```
+
+### Run Wake On Lan command (async)
+```typescript
+asus.wakeOnLan(wakeOnLanDeviceMac)
+```
+
 ## Objects
 ### AsusWRTConnectedDevice
 ```typescript
