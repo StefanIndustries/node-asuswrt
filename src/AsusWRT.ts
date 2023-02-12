@@ -7,6 +7,8 @@ import {AsusWRTLoad} from "./models/AsusWRTLoad";
 import {AsusWRTWANStatus} from "./models/AsusWRTWANStatus";
 import {AsusWRTTrafficData} from "./models/AsusWRTTrafficData";
 import {AsusWRTWakeOnLanDevice} from "./models/AsusWRTWakeOnLanDevice";
+import {AsusWRTOoklaServer} from "./models/AsusWRTOoklaServer";
+import {AsusWRTOoklaSpeedtestHistory} from "./models/AsusWRTOoklaSpeedtestHistory";
 
 export class AsusWRT {
     private axiosInstance: AxiosInstance;
@@ -279,6 +281,75 @@ export class AsusWRT {
         } else {
             return 0;
         }
+    }
+
+    public async getOoklaServers(): Promise<AsusWRTOoklaServer[]> {
+        const ooklaServers: AsusWRTOoklaServer[] = [];
+        const ooklaServerData = await this.appGet('ookla_speedtest_get_servers()');
+        ooklaServerData.ookla_speedtest_get_servers.forEach((server: { id: number; host: string; port: number; name: string; location: string; country: string; }) => {
+            if (server.id) {
+                ooklaServers.push({
+                    id: server.id,
+                    host: server.host,
+                    port: server.port,
+                    name: server.name,
+                    location: server.location,
+                    country: server.country
+                });
+            }
+        })
+        return ooklaServers;
+    }
+
+    public async getOoklaSpeedtestHistory(): Promise<AsusWRTOoklaSpeedtestHistory[]> {
+        const ooklaSpeedtestHistory: AsusWRTOoklaSpeedtestHistory[] = [];
+        const ooklaHistoryData = await this.appGet('ookla_speedtest_get_history()');
+        ooklaHistoryData.ookla_speedtest_get_history.forEach((entry: { timestamp: any; ping: { jitter: any; latency: any; }; download: { bandwidth: any; bytes: any; elapsed: any; }; upload: { bandwidth: any; bytes: any; elapsed: any; }; packetLoss: any; isp: any; }) => {
+            if (entry.timestamp) {
+                ooklaSpeedtestHistory.push({
+                    timestamp: new Date(entry.timestamp),
+                    ping: {
+                        jitter: entry.ping.jitter,
+                        latency: entry.ping.latency
+                    },
+                    download: {
+                        bandwidth: entry.download.bandwidth,
+                        bytes: entry.download.bytes,
+                        elapsed: entry.download.elapsed
+                    },
+                    upload: {
+                        bandwidth: entry.upload.bandwidth,
+                        bytes: entry.upload.bytes,
+                        elapsed: entry.upload.elapsed
+                    },
+                    packetLoss: entry.packetLoss,
+                    isp: entry.isp
+                });
+            }
+        });
+        return ooklaSpeedtestHistory;
+    }
+
+    public async startOoklaSpeedtest(ooklaServer: AsusWRTOoklaServer): Promise<boolean> {
+        const config: AxiosRequestConfig = {
+            method: 'POST',
+            url: '/ookla_speedtest_exe.cgi',
+            data: new URLSearchParams({
+                type: '',
+                id: `${ooklaServer.id}`
+            }),
+            headers: {
+                'Content-Type': 'application/x-www-form-urlencoded'
+            },
+            signal: this.abortController.signal
+        };
+        const result = await this.axiosInstance(config).catch(err => {
+            if (this.debug) {
+                console.log(err);
+            }
+            return Promise.reject(err);
+        });
+        return result.status === 200;
     }
 
     private getCPUUsagePercentage(cpuUsageObj: any): number {
