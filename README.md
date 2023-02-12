@@ -136,8 +136,8 @@ asus.wakeOnLan(wakeOnLanDeviceMac)
 ### AsusWRTOperationMode
 ```typescript
 {
-    Router = 0,
-    AccessPoint = 1
+    Router: 0,
+    AccessPoint: 1
 }
 ```
 
@@ -184,5 +184,13 @@ asus.wakeOnLan(wakeOnLanDeviceMac)
     xdns?: string;
     xlease?: number;
     xexpires?: number;
+}
+```
+
+### AsusWRTWakeOnLanDevice
+```typescript
+{
+    name: string,
+    mac: string
 }
 ```
