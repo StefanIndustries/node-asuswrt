@@ -73,7 +73,7 @@ export class AsusWRT {
     }
 
     private isLoggedIn(cache: AsusWRTCache): boolean {
-        const isLoggedInResult = cache.Token !== '' && cache.TokenDate !== null && cache.TokenDate < Date.now() - (10 * 60 * 1000);
+        const isLoggedInResult = cache.Token !== '' && cache.TokenDate !== null && cache.TokenDate < Date.now() + (10 * 60 * 1000);
         this.debugLog(`[isLoggedIn] ${cache.RouterIP}`, isLoggedInResult);
         return isLoggedInResult
     }
