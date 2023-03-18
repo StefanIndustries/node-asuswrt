@@ -16,7 +16,7 @@ export class AsusWRT {
     private asusTokenProvider: AsusWRTTokenProvider;
     private macIpBinding = new Map<string, string>();
 
-    constructor(baseUrl: string, private username: string, private password: string, private debug?: boolean) {
+    constructor(baseUrl: string, private username: string, private password: string, private logCallback?: (logDescription: string, logData: any) => void) {
         this.axiosInstance = axios.create({
             baseURL: baseUrl,
             timeout: 30000,
@@ -25,25 +25,32 @@ export class AsusWRT {
 
         this.asusTokenProvider = new AsusWRTTokenProvider(this.axiosInstance, username, password);
 
-        if (this.debug) {
+        if (this.logCallback) {
             this.axiosInstance.interceptors.request.use(async (request) => {
-                console.log("url", request.baseURL! + request.url);
-                console.log("data", request.data);
+                this.debugLog("url", request.baseURL! + request.url);
+                this.debugLog("data", request.data);
                 return request;
             });
 
             this.axiosInstance.interceptors.response.use(async (response) => {
-                console.log("response status", response.status);
-                console.log("response data", response.data);
+                this.debugLog("response status", response.status);
+                this.debugLog("response data", response.data);
                 return response;
             });
         }
 
         this.getRouters().then(routers => {
+            this.debugLog('init found routers', routers);
             routers.forEach(router => {
                 this.macIpBinding.set(router.mac, this.axiosInstance.defaults.baseURL!.includes('https://') ? `https://${router.ip}` : `http://${router.ip}`);
             });
         });
+    }
+
+    private debugLog(logDescription: string, logData: any) {
+        if (this.logCallback) {
+            this.logCallback(logDescription, logData);
+        }
     }
 
     private async appGet(payload: string, routerIP?: string): Promise<any> {
@@ -61,9 +68,7 @@ export class AsusWRT {
             signal: this.abortController.signal
         };
         const result = await this.axiosInstance(config).catch(err => {
-            if (this.debug) {
-                console.log(err);
-            }
+            this.debugLog('ERROR appGet', err);
             return Promise.reject(err);
         });
         return result!.data;
@@ -78,9 +83,7 @@ export class AsusWRT {
             signal: this.abortController.signal
         };
         const result = await this.axiosInstance(config).catch(err => {
-            if (this.debug) {
-                console.log(err);
-            }
+            this.debugLog('ERROR applyAppGET', err);
             return Promise.reject(err);
         })
         return result.status === 200
@@ -99,9 +102,7 @@ export class AsusWRT {
             signal: this.abortController.signal
         };
         const result = await this.axiosInstance(config).catch(err => {
-            if (this.debug) {
-                console.log(err);
-            }
+            this.debugLog('ERROR applyAppPOST', err);
             return Promise.reject(err);
         })
         return result.status === 200
@@ -110,6 +111,7 @@ export class AsusWRT {
     public dispose() {
         this.abortController.abort();
         this.asusTokenProvider.disposeCache();
+        this.macIpBinding.clear();
     }
 
     public async getRouters(): Promise<AsusWRTRouter[]> {
@@ -344,9 +346,7 @@ export class AsusWRT {
             signal: this.abortController.signal
         };
         const result = await this.axiosInstance(config).catch(err => {
-            if (this.debug) {
-                console.log(err);
-            }
+            this.debugLog('ERROR start speedtest', err);
             return Promise.reject(err);
         });
         return result.status === 200;
