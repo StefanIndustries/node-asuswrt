@@ -9,9 +9,9 @@ import {AsusWRTOoklaServer} from "./models/AsusWRTOoklaServer";
 import {AsusWRTOoklaSpeedtestHistory} from "./models/AsusWRTOoklaSpeedtestHistory";
 import {AsusWRTOptions} from "./models/AsusWRTOptions";
 import {AsusWRTCache} from "./models/AsusWRTCache";
+import fetch, {Response} from "node-fetch";
 
 export class AsusWRT {
-    private abortController = new AbortController();
     private macIpBinding = new Map<string, string>();
     private cacheDictionary = new Map<string, AsusWRTCache>();
 
@@ -98,7 +98,7 @@ export class AsusWRT {
                 this.errorLog('[login]', response);
                 throw new Error('[login]');
             } else {
-                const jsonResult = await response.json();
+                const jsonResult = <any> await response.json();
                 return jsonResult.asus_token;
             }
         } catch (err) {
@@ -117,8 +117,7 @@ export class AsusWRT {
                 body: new URLSearchParams({
                     hook: payload
                 }),
-                headers: await this.getDefaultHeadersIncludingToken(url),
-                signal: this.abortController.signal
+                headers: await this.getDefaultHeadersIncludingToken(url)
             })
             if (await this.checkStatus(response)) {
                 this.debugLog(`[appGet] ${payload}`, response.status);
@@ -143,8 +142,7 @@ export class AsusWRT {
         try {
             const response = await fetch(`${url}${path}?${payload}`, {
                 method: 'GET',
-                signal: this.abortController.signal,
-                headers: await this.getDefaultHeadersIncludingToken(url),
+                headers: await this.getDefaultHeadersIncludingToken(url)
             });
             return await this.checkStatus(response);
         } catch (err) {
@@ -160,9 +158,8 @@ export class AsusWRT {
         try {
             const response = await fetch(`${url}${path}`, {
                 method: 'POST',
-                signal: this.abortController.signal,
                 body: new URLSearchParams(payload),
-                headers: await this.getDefaultHeadersIncludingToken(url),
+                headers: await this.getDefaultHeadersIncludingToken(url)
             });
             return await this.checkStatus(response);
         } catch (err) {
@@ -172,7 +169,6 @@ export class AsusWRT {
     }
 
     public dispose() {
-        this.abortController.abort();
         this.cacheDictionary.clear();
         this.macIpBinding.clear();
     }
@@ -491,8 +487,7 @@ export class AsusWRT {
                     type: '',
                     id: `${ooklaServer.id}`
                 }),
-                headers: await this.getDefaultHeadersIncludingToken(this.options.BaseUrl),
-                signal: this.abortController.signal
+                headers: await this.getDefaultHeadersIncludingToken(this.options.BaseUrl)
             })
             return this.checkStatus(response);
         } catch (err) {

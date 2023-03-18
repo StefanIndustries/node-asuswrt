@@ -17,12 +17,15 @@
     "url": "https://github.com/StefanIndustries/node-asuswrt/issues"
   },
   "homepage": "https://github.com/StefanIndustries/node-asuswrt",
-  "dependencies": {},
+  "dependencies": {
+    "node-fetch": "2.6.9"
+  },
   "files": [
     "lib/**/*"
   ],
   "devDependencies": {
     "@types/node": "^18.11.18",
+    "@types/node-fetch": "2.6.2",
     "@typescript-eslint/eslint-plugin": "^5.49.0",
     "@typescript-eslint/parser": "^5.49.0",
     "eslint": "^8.33.0",
