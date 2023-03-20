@@ -16,9 +16,10 @@ export class AsusWRT {
     private cacheDictionary = new Map<string, AsusWRTCache>();
 
     constructor(private options: AsusWRTOptions) {
-        this.debugLog(`[CONSTRUCTOR]`, options);
+        const logDescription = `[constructor]`;
+        this.debugLog(`${logDescription}`, options);
         this.getRouters().then(routers => {
-            this.debugLog('init found routers', routers);
+            this.debugLog(`${logDescription} init found routers`, routers);
             routers.forEach(router => {
                 this.macIpBinding.set(router.mac, this.options.BaseUrl!.includes('https://') ? `https://${router.ip}` : `http://${router.ip}`);
             });
@@ -48,37 +49,40 @@ export class AsusWRT {
     }
 
     private async getToken(baseUrl: string): Promise<string> {
-        this.debugLog(`[getToken]`);
+        const logDescription = `[getToken]`;
+        this.debugLog(`${logDescription}`);
         const cache = this.cacheDictionary.get(<string> baseUrl);
         if (cache && this.isLoggedIn(cache)) {
-            this.debugLog(`[getToken] token found in cache and valid`);
+            this.debugLog(`${logDescription} token found in cache and valid`);
             return cache.Token;
         } else {
-            this.debugLog(`[getToken] token expired or not found`);
+            this.debugLog(`${logDescription} token expired or not found`);
             try {
                 const newToken = await this.login(baseUrl);
-                this.debugLog(`[getToken] token retrieved from login`);
+                this.debugLog(`${logDescription} token retrieved from login`);
                 this.cacheDictionary.set(<string>baseUrl, <AsusWRTCache>{
                     Token: newToken,
                     TokenDate: Date.now(),
                     RouterIP: baseUrl
                 });
-                this.debugLog(`[getToken] token set in cache`);
+                this.debugLog(`${logDescription} token set in cache`);
                 return newToken;
             } catch (err) {
-                this.errorLog(`[getToken] ${baseUrl}`, err);
-                throw new Error(`[getToken] ${baseUrl}`);
+                this.errorLog(`${logDescription} ${baseUrl}`, err);
+                throw new Error(`${logDescription} ${baseUrl}`);
             }
         }
     }
 
     private isLoggedIn(cache: AsusWRTCache): boolean {
+        const logDescription = `[isLoggedIn]`;
         const isLoggedInResult = cache.Token !== '' && cache.TokenDate !== null && cache.TokenDate < Date.now() + (10 * 60 * 1000);
-        this.debugLog(`[isLoggedIn] ${cache.RouterIP}`, isLoggedInResult);
+        this.debugLog(`${logDescription} ${cache.RouterIP}`, isLoggedInResult);
         return isLoggedInResult
     }
 
     private async login(baseUrl: string): Promise<string> {
+        const logDescription = `[login]`;
         const path = '/login.cgi';
         const formattedUsernamePassword = Buffer.from(`${this.options.Username}:${this.options.Password}`).toString('base64');
         this.debugLog(`[login] ${baseUrl}`);
@@ -93,7 +97,7 @@ export class AsusWRT {
                     login_authorization: formattedUsernamePassword
                 })
             });
-            this.debugLog(`[login] login result`, response.status);
+            this.debugLog(`${logDescription} login result`, response.status);
             if (!await this.checkStatus(response)) {
                 this.errorLog('[login]', response);
                 throw new Error('[login]');
@@ -102,15 +106,16 @@ export class AsusWRT {
                 return jsonResult.asus_token;
             }
         } catch (err) {
-            this.errorLog(`[login] ${baseUrl}`, err);
-            throw new Error(`[login] ${baseUrl}`);
+            this.errorLog(`${logDescription} ${baseUrl}`, err);
+            throw new Error(`${logDescription} ${baseUrl}`);
         }
     }
 
     private async appGet(payload: string, routerIP?: string): Promise<any> {
+        const logDescription = `[appGet]`;
         const path = '/appGet.cgi';
         const url = routerIP ? routerIP : this.options.BaseUrl;
-        this.debugLog(`[appGet] ${url} ${path} ${payload}`);
+        this.debugLog(`${logDescription} ${url} ${path} ${payload}`);
         try {
             const response = await fetch(`${url}${path}`, {
                 method: 'POST',
@@ -118,27 +123,29 @@ export class AsusWRT {
                     hook: payload
                 }),
                 headers: await this.getDefaultHeadersIncludingToken(url)
-            })
+            });
             if (await this.checkStatus(response)) {
-                this.debugLog(`[appGet] ${payload}`, response.status);
+                this.debugLog(`${logDescription} ${payload}`, response.status);
                 const result = await response.text();
+                this.debugLog(`${logDescription} ${payload} result (text)`, result);
                 try {
                     return JSON.parse(result);
                 } catch (err) {
-                    this.errorLog('[appGet] parsing JSON', result);
+                    this.errorLog(`${logDescription} parsing JSON`, result);
                 }
                 return result;
             }
         } catch (err) {
-            this.errorLog(`[appGet] ${url} ${path} ${payload}`, err);
-            throw new Error(`[appGet] ${url} ${path} ${payload}`);
+            this.errorLog(`${logDescription} ${url} ${path} ${payload}`, err);
+            throw new Error(`${logDescription} ${url} ${path} ${payload}`);
         }
     }
 
     private async applyAppGET(payload: string, routerIP?: string): Promise<boolean> {
+        const logDescription = `[applyAppGET]`;
         const path = '/applyapp.cgi';
         const url = routerIP ? routerIP : this.options.BaseUrl;
-        this.debugLog(`[applyAppGET] ${url} ${path} ${payload}`);
+        this.debugLog(`${logDescription} ${url} ${path} ${payload}`);
         try {
             const response = await fetch(`${url}${path}?${payload}`, {
                 method: 'GET',
@@ -146,15 +153,16 @@ export class AsusWRT {
             });
             return await this.checkStatus(response);
         } catch (err) {
-            this.errorLog(`[applyAppGET] ${url} ${path} ${payload}`, err);
-            throw new Error(`[applyAppGET] ${url} ${path} ${payload}`);
+            this.errorLog(`${logDescription} ${url} ${path} ${payload}`, err);
+            throw new Error(`${logDescription} ${url} ${path} ${payload}`);
         }
     }
 
     private async applyAppPOST(payload: any, routerIP?: string): Promise<boolean> {
+        const logDescription = `[applyAppPOST]`;
         const path = '/applyapp.cgi';
         const url = routerIP ? routerIP : this.options.BaseUrl;
-        this.debugLog(`[applyAppPOST] ${url} ${path} ${payload}`);
+        this.debugLog(`${logDescription} ${url} ${path} ${payload}`);
         try {
             const response = await fetch(`${url}${path}`, {
                 method: 'POST',
@@ -163,8 +171,8 @@ export class AsusWRT {
             });
             return await this.checkStatus(response);
         } catch (err) {
-            this.errorLog(`[applyAppPOST] ${url} ${path} ${payload}`, err);
-            throw new Error(`[applyAppPOST] ${url} ${path} ${payload}`);
+            this.errorLog(`${logDescription} ${url} ${path} ${payload}`, err);
+            throw new Error(`${logDescription} ${url} ${path} ${payload}`);
         }
     }
 
@@ -175,7 +183,8 @@ export class AsusWRT {
 
     //
     public async getRouters(): Promise<AsusWRTRouter[]> {
-        this.debugLog('[getRouters]');
+        const logDescription = `[getRouters]`;
+        this.debugLog(`${logDescription}`);
         try {
             const cfgClientListResponse = await this.appGet('get_cfg_clientlist()');
             return cfgClientListResponse.get_cfg_clientlist.map((client: { alias: any; model_name: any; ui_model_name: any; product_id: any; fwver: any; newfwver: any; ip: any; mac: any; online: any; config: { backhalctrl: any; }; }) => {
@@ -193,13 +202,14 @@ export class AsusWRT {
                 }
             });
         } catch (err) {
-            this.errorLog(`[getRouters]`, err);
-            throw new Error(`[getRouters] ${err}`);
+            this.errorLog(`${logDescription}`, err);
+            throw new Error(`${logDescription} ${err}`);
         }
     }
 
     public async getAllClients(): Promise<AsusWRTConnectedDevice[]> {
-        this.debugLog(`[getAllClients]`);
+        const logDescription = `[getAllClients]`;
+        this.debugLog(`${logDescription}`);
         let allClients: AsusWRTConnectedDevice[] = [];
         try {
             const clientsData = await this.appGet('get_clientlist()');
@@ -219,13 +229,14 @@ export class AsusWRT {
             });
             return allClients;
         } catch (err) {
-            this.errorLog(`[getAllClients]`, err);
-            throw new Error(`[getAllClients] ${err}`);
+            this.errorLog(`${logDescription}`, err);
+            throw new Error(`${logDescription} ${err}`);
         }
     }
 
     public async getWiredClients(routerMac: string): Promise<AsusWRTConnectedDevice[]> {
-        this.debugLog(`[getWiredClients]`, routerMac);
+        const logDescription = `[getWiredClients]`;
+        this.debugLog(`${logDescription}`, routerMac);
         let wiredClients: AsusWRTConnectedDevice[] = [];
         try {
             const clientsData = await this.appGet('get_clientlist();get_wiredclientlist()');
@@ -247,13 +258,14 @@ export class AsusWRT {
             });
             return wiredClients;
         } catch (err) {
-            this.errorLog(`[getWirelessClients] ${routerMac}`, err);
-            throw new Error(`[getWirelessClients] ${routerMac} ${err}`);
+            this.errorLog(`${logDescription} ${routerMac}`, err);
+            throw new Error(`${logDescription} ${routerMac} ${err}`);
         }
     }
 
     public async getWirelessClients(routerMac: string, band: '2G' | '5G'): Promise<AsusWRTConnectedDevice[]> {
-        this.debugLog(`[getWirelessClients]`, [routerMac, band]);
+        const logDescription = `[getWirelessClients]`;
+        this.debugLog(logDescription, [routerMac, band]);
         let wirelessClients: AsusWRTConnectedDevice[] = [];
         try {
             const clientsData = await this.appGet('get_clientlist();get_wclientlist()');
@@ -278,13 +290,14 @@ export class AsusWRT {
             });
             return wirelessClients;
         } catch (err) {
-            this.errorLog(`[getWirelessClients] ${routerMac}`, err);
-            throw new Error(`[getWirelessClients] ${routerMac} ${err}`);
+            this.errorLog(`${logDescription} ${routerMac}`, err);
+            throw new Error(`${logDescription} ${routerMac} ${err}`);
         }
     }
 
     public async getWakeOnLanList(): Promise<AsusWRTWakeOnLanDevice[]> {
-        this.debugLog(`[getWakeOnLanList]`);
+        const logDescription = `[getWakeOnLanList]`;
+        this.debugLog(`${logDescription}`);
         let wolClients: AsusWRTWakeOnLanDevice[] = [];
         try {
             const wolClientsData = await this.appGet('nvram_get(wollist);');
@@ -303,23 +316,25 @@ export class AsusWRT {
             }
             return wolClients;
         } catch (err) {
-            this.errorLog(`[getWakeOnLanList]`, err);
-            throw new Error(`[getWakeOnLanList] ${err}`);
+            this.errorLog(`${logDescription}`, err);
+            throw new Error(`${logDescription} ${err}`);
         }
     }
 
     public async setLedsEnabled(routerMac: string, enabled: boolean): Promise<boolean> {
-        this.debugLog(`[setLedsEnabled]`, [routerMac, enabled]);
+        const logDescription = `[setLedsEnabled]`;
+        this.debugLog(`${logDescription}`, [routerMac, enabled]);
         try {
             return await this.applyAppGET(`config={"led_val":${enabled ? 1 : 0}}&re_mac=${routerMac}&action_mode=config_changed`);
         } catch (err) {
-            this.errorLog(`[setLedsEnabled] ${routerMac}`, err);
-            throw new Error(`[setLedsEnabled] ${routerMac} ${err}`);
+            this.errorLog(`${logDescription} ${routerMac}`, err);
+            throw new Error(`${logDescription} ${routerMac} ${err}`);
         }
     }
 
     public async wakeOnLan(deviceMac: string): Promise<boolean> {
-        this.debugLog(`[wakeOnLan]`, deviceMac);
+        const logDescription = `[wakeOnLan]`;
+        this.debugLog(`${logDescription}`, deviceMac);
         try {
             return await this.applyAppPOST({
                 current_page: "Main_WOL_Content.asp",
@@ -327,13 +342,14 @@ export class AsusWRT {
                 action_mode: " Refresh "
             });
         } catch (err) {
-            this.errorLog(`[wakeOnLan] ${deviceMac}`, err);
-            throw new Error(`[wakeOnLan] ${deviceMac} ${err}`);
+            this.errorLog(`${logDescription} ${deviceMac}`, err);
+            throw new Error(`${logDescription} ${deviceMac} ${err}`);
         }
     }
 
     public async rebootNetwork(): Promise<boolean> {
-        this.debugLog(`[rebootNetwork]`);
+        const logDescription = `[rebootNetwork]`;
+        this.debugLog(`${logDescription}`);
         try {
             const result = await this.applyAppGET(`action_mode=device_reboot`);
             if (result) {
@@ -341,13 +357,14 @@ export class AsusWRT {
             }
             return result;
         } catch (err) {
-            this.errorLog(`[rebootNetwork]`, err);
-            throw new Error(`[rebootNetwork] ${err}`);
+            this.errorLog(`${logDescription}`, err);
+            throw new Error(`${logDescription} ${err}`);
         }
     }
 
     public async getCPUMemoryLoad(routerMac: string): Promise<AsusWRTLoad> {
-        this.debugLog(`[getCPUMemoryLoad]`, routerMac);
+        const logDescription = `[getCPUMemoryLoad]`;
+        this.debugLog(`${logDescription}`, routerMac);
         try {
             const cpuMemoryData = await this.appGet(`cpu_usage(appobj);memory_usage(appobj)`, this.macIpBinding.get(routerMac));
             this.debugLog('test', cpuMemoryData);
@@ -356,13 +373,14 @@ export class AsusWRT {
                 MemoryUsagePercentage: this.getMemoryUsagePercentage(cpuMemoryData.memory_usage)
             };
         } catch (err) {
-            this.errorLog(`[getCPUMemoryLoad] ${routerMac}`, err);
-            throw new Error(`[getCPUMemoryLoad] ${routerMac} ${err}`);
+            this.errorLog(`${logDescription} ${routerMac}`, err);
+            throw new Error(`${logDescription} ${routerMac} ${err}`);
         }
     }
 
     public async getTotalTrafficData(): Promise<AsusWRTTrafficData> {
-        this.debugLog(`[getTotalTrafficData]`);
+        const logDescription = `[getTotalTrafficData]`;
+        this.debugLog(`${logDescription}`);
         try {
             const trafficData = await this.appGet('netdev(appobj)');
             const trafficReceived = (parseInt(trafficData['netdev']['INTERNET_rx'], 16) * 8 / 1024 / 1024) * 0.125;
@@ -372,13 +390,14 @@ export class AsusWRT {
                 trafficSent: trafficSent
             };
         } catch (err) {
-            this.errorLog(`[getTotalTrafficData]`, err);
-            throw new Error(`[getTotalTrafficData] ${err}`);
+            this.errorLog(`${logDescription}`, err);
+            throw new Error(`${logDescription} ${err}`);
         }
     }
 
     public async getWANStatus(): Promise<AsusWRTWANStatus> {
-        this.debugLog(`[getWANStatus]`);
+        const logDescription = `[getWANStatus]`;
+        this.debugLog(`${logDescription}`);
         let status: any = {};
         try {
             const wanData = <string>await this.appGet('wanlink()');
@@ -395,13 +414,14 @@ export class AsusWRT {
             });
             return <AsusWRTWANStatus>status;
         } catch (err) {
-            this.errorLog(`[getUptime]`, err);
-            throw new Error(`[getUptime] ${err}`);
+            this.errorLog(`${logDescription}`, err);
+            throw new Error(`${logDescription} ${err}`);
         }
     }
 
     public async getUptime(routerMac: string): Promise<number> {
-        this.debugLog(`[getUptime]`, routerMac);
+        const logDescription = `[getUptime]`;
+        this.debugLog(`${logDescription}`, routerMac);
         try {
             const uptimeData = await this.appGet('uptime()', this.macIpBinding.get(routerMac));
             if (uptimeData && typeof uptimeData === 'string') {
@@ -413,13 +433,14 @@ export class AsusWRT {
                 return 0;
             }
         } catch (err) {
-            this.errorLog(`[getUptime] ${routerMac}`, err);
-            throw new Error(`[getUptime] ${routerMac} ${err}`);
+            this.errorLog(`${logDescription} ${routerMac}`, err);
+            throw new Error(`${logDescription} ${routerMac} ${err}`);
         }
     }
 
     public async getOoklaServers(): Promise<AsusWRTOoklaServer[]> {
-        this.debugLog(`[getOoklaServers]`);
+        const logDescription = `[getOoklaServers]`;
+        this.debugLog(`${logDescription}`);
         const ooklaServers: AsusWRTOoklaServer[] = [];
         try {
             const ooklaServerData = await this.appGet('ookla_speedtest_get_servers()');
@@ -437,13 +458,14 @@ export class AsusWRT {
             })
             return ooklaServers;
         } catch (err) {
-            this.errorLog(`[getOoklaServers]`, err);
-            throw new Error(`[getOoklaServers] ${err}`);
+            this.errorLog(`${logDescription}`, err);
+            throw new Error(`${logDescription} ${err}`);
         }
     }
 
     public async getOoklaSpeedtestHistory(): Promise<AsusWRTOoklaSpeedtestHistory[]> {
-        this.debugLog(`[getOoklaSpeedtestHistory]`);
+        const logDescription = `[getOoklaSpeedtestHistory]`;
+        this.debugLog(`${logDescription}`);
         const ooklaSpeedtestHistory: AsusWRTOoklaSpeedtestHistory[] = [];
         try {
             const ooklaHistoryData = await this.appGet('ookla_speedtest_get_history()');
@@ -472,14 +494,15 @@ export class AsusWRT {
             });
             return ooklaSpeedtestHistory;
         } catch (err) {
-            this.errorLog(`[getOoklaSpeedtestHistory]`, err);
-            throw new Error(`[getOoklaSpeedtestHistory] ${err}`);
+            this.errorLog(`${logDescription}`, err);
+            throw new Error(`${logDescription} ${err}`);
         }
     }
 
     public async startOoklaSpeedtest(ooklaServer: AsusWRTOoklaServer): Promise<boolean> {
+        const logDescription = `[startOoklaSpeedtest]`;
         const path = '/ookla_speedtest_exe.cgi';
-        this.debugLog(`[startOoklaSpeedtest]`, ooklaServer);
+        this.debugLog(`${logDescription}`, ooklaServer);
         try {
             const response = await fetch(`${this.options.BaseUrl}${path}`, {
                 method: 'POST',
@@ -491,13 +514,14 @@ export class AsusWRT {
             })
             return this.checkStatus(response);
         } catch (err) {
-            this.errorLog(`[startOoklaSpeedtest]`, err);
-            throw new Error(`[startOoklaSpeedtest] ${err}`);
+            this.errorLog(`${logDescription}`, err);
+            throw new Error(`${logDescription} ${err}`);
         }
     }
 
     private async getDefaultHeadersIncludingToken(baseUrl: string): Promise<any> {
-        this.debugLog(`[getDefaultHeadersIncludingToken]`, baseUrl);
+        const logDescription = `[getDefaultHeadersIncludingToken]`;
+        this.debugLog(`${logDescription}`, baseUrl);
         return  {
             'Content-Type': 'application/x-www-form-urlencoded',
             'Cookie': `asus_token=${await this.getToken(baseUrl)}`,
@@ -506,7 +530,8 @@ export class AsusWRT {
     }
 
     private getCPUUsagePercentage(cpuUsageObj: any): number {
-        this.debugLog(`[getCPUUsagePercentage]`, cpuUsageObj);
+        const logDescription = `[getCPUUsagePercentage]`;
+        this.debugLog(`${logDescription}`, cpuUsageObj);
         let totalAvailable = 0;
         let totalUsed = 0;
         for (let i = 1; i < 16; i++) {
@@ -523,7 +548,8 @@ export class AsusWRT {
     }
 
     private addNumberValueIfExists(object: any, property: string): number {
-        this.debugLog(`[addNumberValueIfExists]`);
+        const logDescription = `[addNumberValueIfExists]`;
+        this.debugLog(`${logDescription}`);
         if (object && property && object[property]) {
             return parseInt(object[property]);
         }
@@ -531,23 +557,25 @@ export class AsusWRT {
     }
 
     private getMemoryUsagePercentage(memoryUsageObj: any): number {
-        this.debugLog(`[getMemoryUsagePercentage]`, memoryUsageObj);
+        const logDescription = `[getMemoryUsagePercentage]`;
+        this.debugLog(`${logDescription}`, memoryUsageObj);
         const totalMemory = parseInt(memoryUsageObj.mem_total);
         const memUsed = parseInt(memoryUsageObj.mem_used);
         return (100 / totalMemory) * memUsed;
     }
 
     private async checkStatus(response: Response): Promise<boolean> {
+        const logDescription = `[checkStatus]`;
         try {
             if (response.ok) {
-                this.debugLog(`[checkStatus] OK: `, response.status);
+                this.debugLog(`${logDescription} OK: `, response.status);
                 return true;
             } else {
-                this.errorLog(`[checkStatus] NOT OK: ${response.status} desc: `, response.statusText);
+                this.errorLog(`${logDescription} NOT OK: ${response.status} desc: `, response.statusText);
                 return false;
             }
         } catch (err) {
-            this.errorLog(`[checkStatus] response error: ${response.status}`, err);
+            this.errorLog(`${logDescription} response error: ${response.status}`, err);
             return false;
         }
     }
