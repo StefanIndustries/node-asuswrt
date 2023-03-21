@@ -240,22 +240,25 @@ export class AsusWRT {
         let wiredClients: AsusWRTConnectedDevice[] = [];
         try {
             const clientsData = await this.appGet('get_clientlist();get_wiredclientlist()');
+            if (!clientsData.get_wiredclientlist[routerMac]) {
+                return wiredClients;
+            }
             clientsData.get_wiredclientlist[routerMac].forEach((mac: string) => {
-                if (clientsData.get_clientlist.maclist.includes(mac)) {
-                    const device = clientsData.get_clientlist[mac];
-                    wiredClients.push(<AsusWRTConnectedDevice>{
-                        ip: device.ip,
-                        mac: device.mac,
-                        name: device.name,
-                        nickName: device.nickName,
-                        dpiDevice: device.dpiDevice,
-                        vendor: device.vendor,
-                        ipMethod: device.ipMethod,
-                        rssi: device.rssi !== "" ? parseInt(device.rssi) : 0,
-                        online: device.isOnline && device.isOnline === '1'
-                    });
-                }
-            });
+                    if (clientsData.get_clientlist.maclist.includes(mac)) {
+                        const device = clientsData.get_clientlist[mac];
+                        wiredClients.push(<AsusWRTConnectedDevice>{
+                            ip: device.ip,
+                            mac: device.mac,
+                            name: device.name,
+                            nickName: device.nickName,
+                            dpiDevice: device.dpiDevice,
+                            vendor: device.vendor,
+                            ipMethod: device.ipMethod,
+                            rssi: device.rssi !== "" ? parseInt(device.rssi) : 0,
+                            online: device.isOnline && device.isOnline === '1'
+                        });
+                    }
+                });
             return wiredClients;
         } catch (err) {
             this.errorLog(`${logDescription} ${routerMac}`, err);
@@ -269,7 +272,7 @@ export class AsusWRT {
         let wirelessClients: AsusWRTConnectedDevice[] = [];
         try {
             const clientsData = await this.appGet('get_clientlist();get_wclientlist()');
-            if (!clientsData.get_wclientlist[routerMac][band]) {
+            if (!clientsData.get_wclientlist[routerMac] && !clientsData.get_wcclientlist[routerMac][band]) {
                 return wirelessClients;
             }
             clientsData.get_wclientlist[routerMac][band].forEach((mac: string) => {
