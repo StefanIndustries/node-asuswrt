@@ -187,6 +187,17 @@ export class AsusWRT {
         this.debugLog(`${logDescription}`);
         try {
             const cfgClientListResponse = await this.appGet('get_cfg_clientlist()');
+            if (!cfgClientListResponse.get_cfg_clientlist) {
+                const singleRouterResponse = await this.appGet(`nvram_get(productid);nvram_get(apps_sq);nvram_get(lan_hwaddr);nvram_get(lan_ipaddr);nvram_get(lan_proto);nvram_get(x_setting);nvram_get(label_mac);nvram_get(odmpid);nvram_get(cfg_master);nvram_get(cfg_group);`);
+                return [<AsusWRTRouter>{
+                    productId: singleRouterResponse.productid,
+                    modelName: singleRouterResponse.productid,
+                    mac: singleRouterResponse.label_mac,
+                    ip: singleRouterResponse.lan_ipaddr,
+                    online: true,
+                    operationMode: AsusWRTOperationMode.Router
+                }];
+            }
             return cfgClientListResponse.get_cfg_clientlist.map((client: { alias: any; model_name: any; ui_model_name: any; product_id: any; fwver: any; newfwver: any; ip: any; mac: any; online: any; config: { backhalctrl: any; }; }) => {
                 return <AsusWRTRouter>{
                     alias: client.alias,
