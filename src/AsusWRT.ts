@@ -223,7 +223,12 @@ export class AsusWRT {
         this.debugLog(`${logDescription}`);
         let allClients: AsusWRTConnectedDevice[] = [];
         try {
-            const clientsData = await this.appGet('get_clientlist()');
+            let clientsData = await this.appGet('get_clientlist()');
+            if (clientsData instanceof String) {
+                this.debugLog(`${logDescription} got malformed json back from router, try to fix`);
+                const fixedUpJson = `{"get_clientlist": {${clientsData.substring(19, clientsData.length)}}`;
+                clientsData = JSON.parse(fixedUpJson);
+            }
             clientsData.get_clientlist.maclist.forEach((macAddr: string) => {
                 const device = clientsData.get_clientlist[macAddr];
                 allClients.push(<AsusWRTConnectedDevice>{
