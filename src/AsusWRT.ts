@@ -181,7 +181,6 @@ export class AsusWRT {
         this.macIpBinding.clear();
     }
 
-    //
     public async getRouters(): Promise<AsusWRTRouter[]> {
         const logDescription = `[getRouters]`;
         this.debugLog(`${logDescription}`);
@@ -224,10 +223,9 @@ export class AsusWRT {
         let allClients: AsusWRTConnectedDevice[] = [];
         try {
             let clientsData = await this.appGet('get_clientlist()');
-            if (clientsData instanceof String) {
-                this.debugLog(`${logDescription} got malformed json back from router, try to fix`);
-                const fixedUpJson = `{"get_clientlist": {${clientsData.substring(19, clientsData.length)}}`;
-                clientsData = JSON.parse(fixedUpJson);
+            if (!clientsData.get_clientlist) {
+                this.debugLog(`${logDescription} unable to read get_clientlist`);
+                return allClients;
             }
             clientsData.get_clientlist.maclist.forEach((macAddr: string) => {
                 const device = clientsData.get_clientlist[macAddr];
@@ -256,7 +254,8 @@ export class AsusWRT {
         let wiredClients: AsusWRTConnectedDevice[] = [];
         try {
             const clientsData = await this.appGet('get_clientlist();get_wiredclientlist()');
-            if (!clientsData.get_wiredclientlist[routerMac]) {
+            if (!clientsData.get_wiredclientlist && !clientsData.get_wiredclientlist[routerMac]) {
+                this.debugLog(`${logDescription} unable to read get_wiredclientlist`);
                 return wiredClients;
             }
             clientsData.get_wiredclientlist[routerMac].forEach((mac: string) => {
@@ -288,7 +287,8 @@ export class AsusWRT {
         let wirelessClients: AsusWRTConnectedDevice[] = [];
         try {
             const clientsData = await this.appGet('get_clientlist();get_wclientlist()');
-            if (!clientsData.get_wclientlist[routerMac] && !clientsData.get_wcclientlist[routerMac][band]) {
+            if (!clientsData.get_wclientlist && !clientsData.get_wclientlist[routerMac] && !clientsData.get_wcclientlist[routerMac][band]) {
+                this.debugLog(`${logDescription} unable to read get_wclientlist`);
                 return wirelessClients;
             }
             clientsData.get_wclientlist[routerMac][band].forEach((mac: string) => {
