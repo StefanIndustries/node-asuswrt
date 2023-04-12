@@ -76,7 +76,7 @@ export class AsusWRT {
 
     private isLoggedIn(cache: AsusWRTCache): boolean {
         const logDescription = `[isLoggedIn]`;
-        const isLoggedInResult = cache.Token !== '' && cache.TokenDate !== null && cache.TokenDate < Date.now() + (10 * 60 * 1000);
+        const isLoggedInResult = cache.Token !== '' && cache.TokenDate !== null && cache.TokenDate < Date.now() + (30 * 60 * 1000);
         this.debugLog(`${logDescription} ${cache.RouterIP}`, isLoggedInResult);
         return isLoggedInResult
     }
@@ -254,7 +254,7 @@ export class AsusWRT {
         let wiredClients: AsusWRTConnectedDevice[] = [];
         try {
             const clientsData = await this.appGet('get_clientlist();get_wiredclientlist()');
-            if (!clientsData.get_wiredclientlist && !clientsData.get_wiredclientlist[routerMac]) {
+            if (!clientsData.get_wiredclientlist || !clientsData.get_wiredclientlist[routerMac]) {
                 this.debugLog(`${logDescription} unable to read get_wiredclientlist`);
                 return wiredClients;
             }
@@ -287,11 +287,10 @@ export class AsusWRT {
         let wirelessClients: AsusWRTConnectedDevice[] = [];
         try {
             const clientsData = await this.appGet('get_clientlist();get_wclientlist()');
-            if (!clientsData.get_wclientlist && !clientsData.get_wclientlist[routerMac] && !clientsData.get_wcclientlist[routerMac][band]) {
-                this.debugLog(`${logDescription} unable to read get_wclientlist`);
+            if (!clientsData.get_wclientlist || !clientsData.get_wclientlist.routerMac || !clientsData.get_wclientlist.routerMac.band || !clientsData.get_wclientlist.routerMac.band.length) {                this.debugLog(`${logDescription} unable to read get_wclientlist`);
                 return wirelessClients;
             }
-            clientsData.get_wclientlist[routerMac][band].forEach((mac: string) => {
+            clientsData.get_wclientlist.routerMac.band.forEach((mac: string) => {
                 if (clientsData.get_clientlist.maclist.includes(mac)) {
                     const device = clientsData.get_clientlist[mac];
                     wirelessClients.push(<AsusWRTConnectedDevice>{
@@ -585,17 +584,20 @@ export class AsusWRT {
 
     private async checkStatus(response: Response): Promise<boolean> {
         const logDescription = `[checkStatus]`;
-        try {
-            if (response.ok) {
-                this.debugLog(`${logDescription} OK: `, response.status);
-                return true;
-            } else {
-                this.errorLog(`${logDescription} NOT OK: ${response.status} desc: `, response.statusText);
-                return false;
+        if (response.ok) {
+            this.debugLog(`${logDescription} OK: `, response.status);
+            const clonedResponse = await response.clone().text();
+            if (clonedResponse.includes('error_status')) {
+                const clonedResponseJson = JSON.parse(clonedResponse);
+                if (clonedResponseJson.error_status) {
+                    this.errorLog(`${logDescription} NOT OK: ${response.status} desc: `, clonedResponseJson.error_status);
+                    throw new Error(`${logDescription} NOT OK: ${response.status} error status: ${clonedResponseJson.error_status}`)
+                }
             }
-        } catch (err) {
-            this.errorLog(`${logDescription} response error: ${response.status}`, err);
-            return false;
+            return true;
+        } else {
+            this.errorLog(`${logDescription} NOT OK: ${response.status} desc: `, response.statusText);
+            throw new Error(`${logDescription} NOT OK: ${response.status} desc: ${response.statusText}`)
         }
     }
 }
