@@ -283,10 +283,11 @@ export class AsusWRT {
         let wirelessClients: AsusWRTConnectedDevice[] = [];
         try {
             const clientsData = await this.appGet('get_clientlist();get_wclientlist()');
-            if (!clientsData.get_wclientlist || !clientsData.get_wclientlist.routerMac || !clientsData.get_wclientlist.routerMac.band || !clientsData.get_wclientlist.routerMac.band.length) {                this.debugLog(`${logDescription} unable to read get_wclientlist`);
+            if (!clientsData.get_wclientlist || !clientsData.get_wclientlist[routerMac] || !clientsData.get_wclientlist[routerMac][band]) {
+                this.debugLog(`${logDescription} unable to read get_wclientlist`);
                 return wirelessClients;
             }
-            clientsData.get_wclientlist.routerMac.band.forEach((mac: string) => {
+            clientsData.get_wclientlist[routerMac][band].forEach((mac: string) => {
                 if (clientsData.get_clientlist.maclist.includes(mac)) {
                     const device = clientsData.get_clientlist[mac];
                     wirelessClients.push(<AsusWRTConnectedDevice>{
