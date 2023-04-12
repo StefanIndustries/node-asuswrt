@@ -98,13 +98,9 @@ export class AsusWRT {
                 })
             });
             this.debugLog(`${logDescription} login result`, response.status);
-            if (!await this.checkStatus(response)) {
-                this.errorLog('[login]', response);
-                throw new Error('[login]');
-            } else {
-                const jsonResult = <any> await response.json();
-                return jsonResult.asus_token;
-            }
+            await this.checkStatus(response);
+            const jsonResult = <any> await response.json();
+            return jsonResult.asus_token;
         } catch (err) {
             this.errorLog(`${logDescription} ${baseUrl}`, err);
             throw new Error(`${logDescription} ${baseUrl}`);
