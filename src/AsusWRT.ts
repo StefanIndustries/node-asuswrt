@@ -184,21 +184,25 @@ export class AsusWRT {
             const cfgClientListResponse = await this.appGet('get_cfg_clientlist()');
             if (cfgClientListResponse && (typeof cfgClientListResponse.get_cfg_clientlist === 'undefined' || !Array.isArray(cfgClientListResponse.get_cfg_clientlist))) {
                 const singleRouterResponse = await this.appGet(`nvram_get(productid);nvram_get(apps_sq);nvram_get(lan_hwaddr);nvram_get(lan_ipaddr);nvram_get(lan_proto);nvram_get(x_setting);nvram_get(label_mac);nvram_get(odmpid);nvram_get(cfg_master);nvram_get(cfg_group);`);
+                const productid = singleRouterResponse.productid ? singleRouterResponse.productid : singleRouterResponse.model_name;
+                const modelName = singleRouterResponse.model_name ? singleRouterResponse.model_name : productid;
                 return [<AsusWRTRouter>{
-                    productId: singleRouterResponse.productid,
-                    modelName: singleRouterResponse.productid,
+                    productId: productid,
+                    modelName: modelName,
                     mac: singleRouterResponse.label_mac,
                     ip: singleRouterResponse.lan_ipaddr,
                     online: true,
                     operationMode: AsusWRTOperationMode.Router
                 }];
             }
-            return cfgClientListResponse.get_cfg_clientlist.map((client: { alias: any; model_name: any; ui_model_name: any; product_id: any; fwver: any; newfwver: any; ip: any; mac: any; online: any; config: { backhalctrl: any; }; }) => {
+            return cfgClientListResponse.get_cfg_clientlist.map((client: any) => {
+                const productid = client.productid ? client.productid : client.model_name;
+                const modelName = client.model_name ? client.model_name : productid;
                 return <AsusWRTRouter>{
                     alias: client.alias,
-                    modelName: client.model_name,
+                    modelName: modelName,
                     uiModelName: client.ui_model_name,
-                    productId: client.product_id,
+                    productId: productid,
                     firmwareVersion: client.fwver,
                     newFirmwareVersion: client.newfwver,
                     ip: client.ip,
