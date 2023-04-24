@@ -18,12 +18,6 @@ export class AsusWRT {
     constructor(private options: AsusWRTOptions) {
         const logDescription = `[constructor]`;
         this.debugLog(`${logDescription}`, options);
-        this.getRouters().then(routers => {
-            this.debugLog(`${logDescription} init found routers`, routers);
-            routers.forEach(router => {
-                this.macIpBinding.set(router.mac, this.options.BaseUrl!.includes('https://') ? `https://${router.ip}` : `http://${router.ip}`);
-            });
-        });
     }
 
     private debugLog(logDescription: string, logData?: any) {
@@ -186,7 +180,7 @@ export class AsusWRT {
                 const singleRouterResponse = await this.appGet(`nvram_get(productid);nvram_get(apps_sq);nvram_get(lan_hwaddr);nvram_get(lan_ipaddr);nvram_get(lan_proto);nvram_get(x_setting);nvram_get(label_mac);nvram_get(odmpid);nvram_get(cfg_master);nvram_get(cfg_group);`);
                 const productid = singleRouterResponse.productid ? singleRouterResponse.productid : singleRouterResponse.model_name;
                 const modelName = singleRouterResponse.model_name ? singleRouterResponse.model_name : productid;
-                return [<AsusWRTRouter>{
+                const routers = [<AsusWRTRouter>{
                     productId: productid,
                     modelName: modelName,
                     mac: singleRouterResponse.label_mac,
@@ -194,11 +188,15 @@ export class AsusWRT {
                     online: true,
                     operationMode: AsusWRTOperationMode.Router
                 }];
+                routers.forEach(router => {
+                    this.macIpBinding.set(router.mac, this.options.BaseUrl!.includes('https://') ? `https://${router.ip}` : `http://${router.ip}`);
+                });
+                return routers;
             }
             return cfgClientListResponse.get_cfg_clientlist.map((client: any) => {
                 const productid = client.productid ? client.productid : client.model_name;
                 const modelName = client.model_name ? client.model_name : productid;
-                return <AsusWRTRouter>{
+                const router = <AsusWRTRouter>{
                     alias: client.alias,
                     modelName: modelName,
                     uiModelName: client.ui_model_name,
@@ -209,7 +207,9 @@ export class AsusWRT {
                     mac: client.mac,
                     online: !!(client.online && client.online === "1"),
                     operationMode: client.config && client.config.backhalctrl ? AsusWRTOperationMode.AccessPoint : AsusWRTOperationMode.Router
-                }
+                };
+                this.macIpBinding.set(router.mac, this.options.BaseUrl!.includes('https://') ? `https://${router.ip}` : `http://${router.ip}`);
+                return router;
             });
         } catch (err) {
             this.errorLog(`${logDescription}`, err);
@@ -592,6 +592,7 @@ export class AsusWRT {
                 const clonedResponseJson = JSON.parse(clonedResponse);
                 if (clonedResponseJson.error_status) {
                     this.errorLog(`${logDescription} NOT OK: ${response.status} desc: `, clonedResponseJson.error_status);
+                    this.dispose();
                     throw new Error(`${logDescription} NOT OK: ${response.status} error status: ${clonedResponseJson.error_status}`)
                 }
             }
