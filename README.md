@@ -7,7 +7,27 @@ All async methods return promise based types and can be awaited.
 ```typescript
 import { AsusWRT } from "node-asuswrt";
 
-const asus = new AsusWRT('http://192.168.1.1', 'admin', 'password');
+const config = {
+    Username: 'admin',
+    Password: 'password',
+    BaseUrl: 'http://192.168.1.1',
+    ErrorLogCallback: (logDescription, logData) => { // optional property
+        if (logData) {
+            console.log(logDescription, logData);
+        } else {
+            console.log(logDescription);
+        }
+    },
+    InfoLogCallback: (logDescription, logData) => { // optional property
+        if (logData) {
+            console.log(logDescription, logData);
+        } else {
+            console.log(logDescription);
+        }
+    }
+}
+
+const asus = new AsusWRT.AsusWRT(config);
 
 asus.getWANStatus().then(result => {
     console.log(result);
@@ -44,12 +64,27 @@ import { AsusWRT } from "node-asuswrt";
 
 ### Create a new instance of the wrapper
 ```typescript
-const asus = new AsusWRT('http://192.168.1.1', 'admin', 'password')
-```
+const config = {
+    Username: 'admin',
+    Password: 'password',
+    BaseUrl: 'http://192.168.1.1',
+    ErrorLogCallback: (logDescription, logData) => { // optional
+        if (logData) {
+            console.log(logDescription, logData);
+        } else {
+            console.log(logDescription);
+        }
+    },
+    InfoLogCallback: (logDescription, logData) => { // optional
+        if (logData) {
+            console.log(logDescription, logData);
+        } else {
+            console.log(logDescription);
+        }
+    }
+}
 
-### Enable debug mode for console logs
-```typescript
-const asus = new AsusWRT('http://192.168.1.1', 'admin', 'password', true)
+const asus = new AsusWRT.AsusWRT(config);
 ```
 
 ### Get all routers in the network (async)
@@ -77,6 +112,11 @@ asus.setLedsEnabled(router.mac, false) // turns leds off
 ### Reboot network (all access points) (async)
 ```typescript
 asus.rebootNetwork()
+```
+
+### Reboot router (async)
+```typescript
+asus.rebootDevice(router.mac);
 ```
 
 ### Get CPU and Memory Load (async)

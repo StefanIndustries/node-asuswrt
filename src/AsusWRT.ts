@@ -381,6 +381,18 @@ export class AsusWRT {
         }
     }
 
+    public async rebootDevice(routerMac: string): Promise<boolean> {
+        const logDescription = `[rebootDevice]`;
+        this.debugLog(`${logDescription}`, routerMac);
+        try {
+            const result = await this.applyAppPOST({"action_mode": "apply", "rc_service": "reboot"}, this.macIpBinding.get(routerMac));
+            return result;
+        } catch (err) {
+            this.errorLog(`${logDescription} ${routerMac}`, err);
+            throw new Error(`${logDescription} ${routerMac} ${err}`);
+        }
+    }
+
     public async getCPUMemoryLoad(routerMac: string): Promise<AsusWRTLoad> {
         const logDescription = `[getCPUMemoryLoad]`;
         this.debugLog(`${logDescription}`, routerMac);
