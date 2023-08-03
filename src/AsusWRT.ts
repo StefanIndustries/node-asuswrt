@@ -474,7 +474,10 @@ export class AsusWRT {
         this.debugLog(`${logDescription}`);
         const ooklaServers: AsusWRTOoklaServer[] = [];
         try {
-            const ooklaServerData = await this.appGet('ookla_speedtest_get_servers()');
+            let ooklaServerData = await this.appGet('ookla_speedtest_get_servers()');
+            if (ooklaServerData.ookla_speedtest_get_servers.length === 0) { // sometimes first result is empty...
+                ooklaServerData = await this.appGet('ookla_speedtest_get_servers()');
+            }
             ooklaServerData.ookla_speedtest_get_servers.forEach((server: { id: number; host: string; port: number; name: string; location: string; country: string; }) => {
                 if (server.id) {
                     ooklaServers.push({
@@ -530,11 +533,34 @@ export class AsusWRT {
         }
     }
 
+    private async setOoklaSpeedtestStartTime(): Promise<boolean> {
+        const logDescription = `[setOoklaSpeedtestStartTime]`;
+        const path = '/set_ookla_speedtest_start_time.cgi';
+        this.debugLog(`${logDescription}`);
+        try {
+            const response = await fetch(`${this.options.BaseUrl}${path}`, {
+                method: 'POST',
+                body: new URLSearchParams({
+                    ookla_start_time: Date.now().toString(),
+                }),
+                headers: await this.getDefaultHeadersIncludingToken(this.options.BaseUrl)
+            })
+            return this.checkStatus(response);
+        } catch (err) {
+            this.errorLog(`${logDescription}`, err);
+            throw new Error(`${logDescription} ${err}`);
+        }
+    }
+
     public async startOoklaSpeedtest(ooklaServer: AsusWRTOoklaServer): Promise<boolean> {
         const logDescription = `[startOoklaSpeedtest]`;
         const path = '/ookla_speedtest_exe.cgi';
         this.debugLog(`${logDescription}`, ooklaServer);
         try {
+            const setStartTimeResponse = await this.setOoklaSpeedtestStartTime();
+            if (!setStartTimeResponse) {
+                return false;
+            }
             const response = await fetch(`${this.options.BaseUrl}${path}`, {
                 method: 'POST',
                 body: new URLSearchParams({
