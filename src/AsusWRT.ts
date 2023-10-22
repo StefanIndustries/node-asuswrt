@@ -10,6 +10,7 @@ import { AsusWRTOptions } from "./models/AsusWRTOptions";
 import { AsusWRTCache } from "./models/AsusWRTCache";
 import axios, { AxiosInstance } from "axios";
 import { AsusWRTOoklaSpeedtestResult } from "./models/AsusWRTOoklaSpeedtestResult";
+import { AsusWRTVPNClient } from "./models/AsusWRTVPNClient";
 
 export class AsusWRT {
     private ax: AxiosInstance;
@@ -194,7 +195,10 @@ export class AsusWRT {
             baseURL: url,
             url: path,
             method: 'POST',
-            data: new URLSearchParams(payload)
+            headers: {
+                'Content-Type': 'application/x-www-form-urlencoded'
+            },
+            data: payload
         });
         return response.status >= 200 && response.status < 300;
     }
@@ -500,6 +504,75 @@ export class AsusWRT {
         } catch (err) {
             this.errorLog(`${logDescription} ${routerMac}`, err);
             throw new Error(`${logDescription} ${routerMac} ${err}`);
+        }
+    }
+
+    public async getVPNClients(): Promise<any> {
+        const logDescription = `[getVPNClients]`;
+        this.debugLog(`${logDescription}`);
+        try {
+            const result = await this.appGet('nvram_get(vpnc_clientlist);nvram_get(vpnc_pptp_options_x_list);nvram_get(vpnc_proto);nvram_get(vpnc_heartbeat_x);nvram_get(vpnc_pppoe_username);nvram_get(vpn_clientx_eas);nvram_get(vpn_client1_state);nvram_get(vpn_client2_state);nvram_get(vpn_client3_state);nvram_get(vpn_client4_state);nvram_get(vpn_client5_state);nvram_get(vpn_client1_errno);nvram_get(vpn_client2_errno);nvram_get(vpn_client3_errno);nvram_get(vpn_client4_errno);nvram_get(vpn_client5_errno);nvram_get(vpnc_state_t);nvram_get(vpnc_sbstate_t);');
+            const vpnListUnMapped = result.vpnc_clientlist.split('&#60').map((item: string) => { return item.split('&#62') });
+            const vpnList = vpnListUnMapped.map((item: string[]) => {
+                return <AsusWRTVPNClient> {
+                    description: item[0],
+                    protocol: item[1],
+                    unit: item[2],
+                    username: item[3],
+                    password: item[4]
+                }
+            });
+            return vpnList;
+        } catch (err) {
+            this.errorLog(`${logDescription}`, err);
+            throw new Error(`${logDescription} ${err}`);
+        }
+    }
+
+    public async setActiveVPNClient(client: AsusWRTVPNClient): Promise<any> {
+        const logDescription = `[setActiveVPNClient]`;
+        this.debugLog(`${logDescription}`);
+        let data: any = {
+            "vpnc_proto": `${client.protocol.toLowerCase()}`,
+            "vpnc_pptp_options_x": "auto",
+            "vpn_clientx_eas": `${client.unit},`,
+            "vpn_client_unit": `${client.unit}`,
+            [`vpn_client${client.unit}_username`]: `${client.username}`,
+            [`vpn_client${client.unit}_password`]: `${client.password}`,
+            "action_mode": "apply"
+        };
+        try {
+            const result = await this.applyAppPOST(JSON.stringify(data));
+            if (result) {
+                return await this.applyAppPOST({"action_mode": "apply", "rc_service": "restart_vpncall;"});
+            }
+        } catch (err) {
+            this.errorLog(`${logDescription}`, err);
+            throw new Error(`${logDescription} ${err}`);
+        }
+    }
+
+    public async disableVPNClient(): Promise<any> {
+        const logDescription = `[disableVPNClient]`;
+        this.debugLog(`${logDescription}`);
+        let data: any = {
+            "vpnc_proto": "disable",
+            "vpnc_pptp_options_x": "",
+            "vpn_clientx_eas": "",
+            "vpn_client_unit": "",
+            "vpnc_pppoe_username": "",
+            "vpnc_pppoe_passwd": "",
+            "vpnc_heartbeat_x": "",
+            "action_mode": "apply"
+        };
+        try {
+            const result = await this.applyAppPOST(JSON.stringify(data));
+            if (result) {
+                return await this.applyAppPOST({"action_mode": "apply", "rc_service": "restart_vpncall;"});
+            }
+        } catch (err) {
+            this.errorLog(`${logDescription}`, err);
+            throw new Error(`${logDescription} ${err}`);
         }
     }
 
