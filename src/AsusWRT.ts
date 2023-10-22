@@ -1,14 +1,13 @@
-import {AsusWRTRouter} from "./models/AsusWRTRouter";
-import {AsusWRTOperationMode} from "./models/AsusWRTOperationMode";
-import {AsusWRTConnectedDevice} from "./models/AsusWRTConnectedDevice";
-import {AsusWRTLoad} from "./models/AsusWRTLoad";
-import {AsusWRTWANStatus} from "./models/AsusWRTWANStatus";
-import {AsusWRTTrafficData} from "./models/AsusWRTTrafficData";
-import {AsusWRTWakeOnLanDevice} from "./models/AsusWRTWakeOnLanDevice";
-import {AsusWRTOoklaServer} from "./models/AsusWRTOoklaServer";
-import {AsusWRTOoklaSpeedtestHistory} from "./models/AsusWRTOoklaSpeedtestHistory";
-import {AsusWRTOptions} from "./models/AsusWRTOptions";
-import {AsusWRTCache} from "./models/AsusWRTCache";
+import { AsusWRTRouter } from "./models/AsusWRTRouter";
+import { AsusWRTOperationMode } from "./models/AsusWRTOperationMode";
+import { AsusWRTConnectedDevice } from "./models/AsusWRTConnectedDevice";
+import { AsusWRTLoad } from "./models/AsusWRTLoad";
+import { AsusWRTWANStatus } from "./models/AsusWRTWANStatus";
+import { AsusWRTTrafficData } from "./models/AsusWRTTrafficData";
+import { AsusWRTWakeOnLanDevice } from "./models/AsusWRTWakeOnLanDevice";
+import { AsusWRTOoklaServer } from "./models/AsusWRTOoklaServer";
+import { AsusWRTOptions } from "./models/AsusWRTOptions";
+import { AsusWRTCache } from "./models/AsusWRTCache";
 import axios, { AxiosInstance } from "axios";
 import { AsusWRTOoklaSpeedtestResult } from "./models/AsusWRTOoklaSpeedtestResult";
 
@@ -532,36 +531,12 @@ export class AsusWRT {
         }
     }
 
-    public async getOoklaSpeedtestHistory(): Promise<AsusWRTOoklaSpeedtestHistory[]> {
+    public async getOoklaSpeedtestHistory(): Promise<AsusWRTOoklaSpeedtestResult[]> {
         const logDescription = `[getOoklaSpeedtestHistory]`;
         this.debugLog(`${logDescription}`);
-        const ooklaSpeedtestHistory: AsusWRTOoklaSpeedtestHistory[] = [];
         try {
             const ooklaHistoryData = await this.appGet('ookla_speedtest_get_history()');
-            ooklaHistoryData.ookla_speedtest_get_history.forEach((entry: { timestamp: any; ping: { jitter: any; latency: any; }; download: { bandwidth: any; bytes: any; elapsed: any; }; upload: { bandwidth: any; bytes: any; elapsed: any; }; packetLoss: any; isp: any; }) => {
-                if (entry.timestamp) {
-                    ooklaSpeedtestHistory.push({
-                        timestamp: new Date(entry.timestamp),
-                        ping: {
-                            jitter: entry.ping.jitter,
-                            latency: entry.ping.latency
-                        },
-                        download: {
-                            bandwidth: entry.download.bandwidth,
-                            bytes: entry.download.bytes,
-                            elapsed: entry.download.elapsed
-                        },
-                        upload: {
-                            bandwidth: entry.upload.bandwidth,
-                            bytes: entry.upload.bytes,
-                            elapsed: entry.upload.elapsed
-                        },
-                        packetLoss: entry.packetLoss,
-                        isp: entry.isp
-                    });
-                }
-            });
-            return ooklaSpeedtestHistory;
+            return ooklaHistoryData.ookla_speedtest_get_history.filter((element: any) => element && element.type && element.type === 'result');
         } catch (err) {
             this.errorLog(`${logDescription}`, err);
             throw new Error(`${logDescription} ${err}`);
@@ -583,12 +558,7 @@ export class AsusWRT {
         return response.status >= 200 && response.status < 300;
     }
 
-    // private async getOoklaSpeedtestResult(): Promise<AsusWRTOoklaSpeedtestResult> {
-    //     const logDescription = `[getOoklaSpeedtestResult]`;
-    //
-    // }
-
-    public async startOoklaSpeedtest(ooklaServer: AsusWRTOoklaServer): Promise<boolean> {
+    private async startOoklaSpeedtest(ooklaServer: AsusWRTOoklaServer): Promise<boolean> {
         const logDescription = `[startOoklaSpeedtest]`;
         const path = '/ookla_speedtest_exe.cgi';
         this.debugLog(`${logDescription}`, ooklaServer);
@@ -606,6 +576,47 @@ export class AsusWRT {
             })
         });
         return response.status >= 200 && response.status < 300;
+    }
+
+    private async getOoklaSpeedtestResult(): Promise<AsusWRTOoklaSpeedtestResult> {
+        const logDescription = `[getOoklaSpeedtestResult]`;
+        let nRetrieveResultAttempts = 0;
+        while(nRetrieveResultAttempts < 30) {
+            const data = await this.appGet('ookla_speedtest_get_result()');
+            const result: AsusWRTOoklaSpeedtestResult = data.ookla_speedtest_get_result.find((element: any) => element.type === 'result');
+            if (result) {
+                return result;
+            }
+            nRetrieveResultAttempts++;
+            await new Promise(resolve => setTimeout(resolve, 1000));
+        }
+        throw new Error(`${logDescription} unable to retrieve speedtest result`);
+    }
+
+    private async writeOoklaSpeedtestResult(result: AsusWRTOoklaSpeedtestResult): Promise<boolean> {
+        const logDescription = `[writeOoklaSpeedtestResult]`;
+        this.debugLog(`${logDescription}`, result);
+        const path = '/ookla_speedtest_write_history.cgi';
+        const previousHistory = await this.getOoklaSpeedtestHistory();
+        const uglyJsonString = JSON.stringify(result) + `\n` + previousHistory.map((element: any) => JSON.stringify(element)).join(`\n`);
+        const response = await this.ax.request({
+            url: path,
+            method: 'POST',
+            data: new URLSearchParams({
+                speedTest_history: uglyJsonString
+            })
+        });
+        return response.status >= 200 && response.status < 300;
+    }
+
+    public async runOoklaSpeedtest(ooklaServer: AsusWRTOoklaServer): Promise<AsusWRTOoklaSpeedtestResult> {
+        const logDescription = `[runOoklaSpeedtestResult]`;
+        this.debugLog(`${logDescription}`, ooklaServer);
+        await this.setOoklaSpeedtestStartTime();
+        await this.startOoklaSpeedtest(ooklaServer);
+        const result = await this.getOoklaSpeedtestResult();
+        await this.writeOoklaSpeedtestResult(result);
+        return result;
     }
 
     private getCPUUsagePercentage(cpuUsageObj: any): number {
