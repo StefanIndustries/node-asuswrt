@@ -522,6 +522,9 @@ export class AsusWRT {
                     password: item[4]
                 }
             });
+            if (vpnList[0].description === '' && vpnList[0].protocol === undefined) {
+                return [];
+            }
             return vpnList;
         } catch (err) {
             this.errorLog(`${logDescription}`, err);
