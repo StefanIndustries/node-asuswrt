@@ -9,14 +9,67 @@ import {AsusWRTOoklaServer} from "./models/AsusWRTOoklaServer";
 import {AsusWRTOoklaSpeedtestHistory} from "./models/AsusWRTOoklaSpeedtestHistory";
 import {AsusWRTOptions} from "./models/AsusWRTOptions";
 import {AsusWRTCache} from "./models/AsusWRTCache";
-import fetch, {Response} from "node-fetch";
+import axios, { AxiosInstance } from "axios";
+import { AsusWRTOoklaSpeedtestResult } from "./models/AsusWRTOoklaSpeedtestResult";
 
 export class AsusWRT {
+    private ax: AxiosInstance;
+    private abortController = new AbortController();
     private macIpBinding = new Map<string, string>();
     private cacheDictionary = new Map<string, AsusWRTCache>();
 
     constructor(private options: AsusWRTOptions) {
         const logDescription = `[constructor]`;
+        this.ax = axios.create({
+            baseURL: options.BaseUrl,
+            timeout: 30000,
+            signal: this.abortController.signal,
+            headers: { 'User-Agent': 'asusrouter-Android-DUTUtil-1.0.0.3.58-163' }
+        });
+
+        // interceptor to add token to request
+        this.ax.interceptors.request.use(async (request) => {
+            if (request.url && request.url.includes('login.cgi')) {
+                return request;
+            }
+            const cache = this.cacheDictionary.get(<string> request.baseURL);
+            if (cache && this.isLoggedIn(cache)) {
+                delete request.headers!['Cookie'];
+                request.headers!['Cookie'] = `asus_token=${cache.Token}`
+            }
+            return request;
+        });
+
+        // interceptor to reaquire token on error_status response
+        this.ax.interceptors.response.use(async (response) => {
+            if (response.config.url !== '/login.cgi' && response.data && response.data.error_status) {
+                const newToken = await this.login(<string>response.config.baseURL);
+                this.cacheDictionary.set(<string>response.config.baseURL, <AsusWRTCache>{
+                    Token: newToken,
+                    TokenDate: Date.now(),
+                    RouterIP: response.config.baseURL
+                });
+                delete response.config.headers!['Cookie'];
+                response.config.headers!['Cookie'] = `asus_token=${newToken}`;
+                return this.ax.request(response.config);
+            }
+            return response;
+        });
+
+        this.ax.interceptors.request.use(request => {
+            this.debugLog(`${request.url} request`, request);
+            return request;
+        });
+
+        this.ax.interceptors.response.use(response => {
+            this.debugLog(`${response.request.url} response`, response);
+            return response;
+        })
+
+        this.ax.interceptors.response.use(response => response, error => {
+            this.errorLog(`error`, error);
+        });
+
         this.debugLog(`${logDescription}`, options);
     }
 
@@ -70,7 +123,7 @@ export class AsusWRT {
 
     private isLoggedIn(cache: AsusWRTCache): boolean {
         const logDescription = `[isLoggedIn]`;
-        const isLoggedInResult = cache.Token !== '' && cache.TokenDate !== null && cache.TokenDate < Date.now() + (30 * 60 * 1000);
+        const isLoggedInResult = cache.Token !== '' && cache.TokenDate !== null;
         this.debugLog(`${logDescription} ${cache.RouterIP}`, isLoggedInResult);
         return isLoggedInResult
     }
@@ -80,25 +133,22 @@ export class AsusWRT {
         const path = '/login.cgi';
         const formattedUsernamePassword = Buffer.from(`${this.options.Username}:${this.options.Password}`).toString('base64');
         this.debugLog(`[login] ${baseUrl}`);
-        try {
-            const response = await fetch(`${baseUrl}${path}`, {
-                method: 'POST',
-                headers: {
-                    'User-Agent': 'asusrouter-Android-DUTUtil-1.0.0.3.58-163',
-                    'Content-Type': 'application/x-www-form-urlencoded'
-                },
-                body: new URLSearchParams({
-                    login_authorization: formattedUsernamePassword
-                })
-            });
-            this.debugLog(`${logDescription} login result`, response.status);
-            await this.checkStatus(response);
-            const jsonResult = <any> await response.json();
-            return jsonResult.asus_token;
-        } catch (err) {
-            this.errorLog(`${logDescription} ${baseUrl}`, err);
-            throw new Error(`${logDescription} ${baseUrl}`);
+        const response = await this.ax.request({
+            baseURL: baseUrl,
+            method: 'POST',
+            url: path,
+            data: new URLSearchParams({
+                login_authorization: formattedUsernamePassword
+            }),
+            headers: {
+                'Content-Type': 'application/x-www-form-urlencoded'
+            }
+        });
+        this.debugLog(`${logDescription} login result`, response.status);
+        if (!response.data.asus_token) {
+            throw new Error('No valid token received');
         }
+        return response.data.asus_token;
     }
 
     private async appGet(payload: string, routerIP?: string): Promise<any> {
@@ -106,29 +156,21 @@ export class AsusWRT {
         const path = '/appGet.cgi';
         const url = routerIP ? routerIP : this.options.BaseUrl;
         this.debugLog(`${logDescription} ${url} ${path} ${payload}`);
+        const response = await this.ax.request({
+            baseURL: url,
+            url: path,
+            method: 'POST',
+            data: new URLSearchParams({
+                hook: payload
+            })
+        });
+        const result = response.data;
         try {
-            const response = await fetch(`${url}${path}`, {
-                method: 'POST',
-                body: new URLSearchParams({
-                    hook: payload
-                }),
-                headers: await this.getDefaultHeadersIncludingToken(url)
-            });
-            if (await this.checkStatus(response)) {
-                this.debugLog(`${logDescription} ${payload}`, response.status);
-                const result = await response.text();
-                this.debugLog(`${logDescription} ${payload} result (text)`, result);
-                try {
-                    return JSON.parse(result);
-                } catch (err) {
-                    this.errorLog(`${logDescription} parsing JSON`, result);
-                }
-                return result;
-            }
+            return JSON.parse(result);
         } catch (err) {
-            this.errorLog(`${logDescription} ${url} ${path} ${payload}`, err);
-            throw new Error(`${logDescription} ${url} ${path} ${payload}`);
+            this.errorLog(`${logDescription} parsing JSON`, result);
         }
+        return result;
     }
 
     private async applyAppGET(payload: string, routerIP?: string): Promise<boolean> {
@@ -136,16 +178,12 @@ export class AsusWRT {
         const path = '/applyapp.cgi';
         const url = routerIP ? routerIP : this.options.BaseUrl;
         this.debugLog(`${logDescription} ${url} ${path} ${payload}`);
-        try {
-            const response = await fetch(`${url}${path}?${payload}`, {
-                method: 'GET',
-                headers: await this.getDefaultHeadersIncludingToken(url)
-            });
-            return await this.checkStatus(response);
-        } catch (err) {
-            this.errorLog(`${logDescription} ${url} ${path} ${payload}`, err);
-            throw new Error(`${logDescription} ${url} ${path} ${payload}`);
-        }
+        const response = await this.ax.request({
+            baseURL: url,
+            url: `${path}?${payload}`,
+            method: 'GET',
+        });
+        return response.status >= 200 && response.status < 300;
     }
 
     private async applyAppPOST(payload: any, routerIP?: string): Promise<boolean> {
@@ -153,20 +191,17 @@ export class AsusWRT {
         const path = '/applyapp.cgi';
         const url = routerIP ? routerIP : this.options.BaseUrl;
         this.debugLog(`${logDescription} ${url} ${path} ${payload}`);
-        try {
-            const response = await fetch(`${url}${path}`, {
-                method: 'POST',
-                body: new URLSearchParams(payload),
-                headers: await this.getDefaultHeadersIncludingToken(url)
-            });
-            return await this.checkStatus(response);
-        } catch (err) {
-            this.errorLog(`${logDescription} ${url} ${path} ${payload}`, err);
-            throw new Error(`${logDescription} ${url} ${path} ${payload}`);
-        }
+        const response = await this.ax.request({
+            baseURL: url,
+            url: path,
+            method: 'POST',
+            data: new URLSearchParams(payload)
+        });
+        return response.status >= 200 && response.status < 300;
     }
 
     public dispose() {
+        this.abortController.abort();
         this.cacheDictionary.clear();
         this.macIpBinding.clear();
     }
@@ -537,53 +572,40 @@ export class AsusWRT {
         const logDescription = `[setOoklaSpeedtestStartTime]`;
         const path = '/set_ookla_speedtest_start_time.cgi';
         this.debugLog(`${logDescription}`);
-        try {
-            const response = await fetch(`${this.options.BaseUrl}${path}`, {
-                method: 'POST',
-                body: new URLSearchParams({
-                    ookla_start_time: Date.now().toString(),
-                }),
-                headers: await this.getDefaultHeadersIncludingToken(this.options.BaseUrl)
+        const response = await this.ax.request({
+            baseURL: this.options.BaseUrl,
+            url: path,
+            method: 'POST',
+            data: new URLSearchParams({
+                ookla_start_time: Date.now().toString()
             })
-            return this.checkStatus(response);
-        } catch (err) {
-            this.errorLog(`${logDescription}`, err);
-            throw new Error(`${logDescription} ${err}`);
-        }
+        });
+        return response.status >= 200 && response.status < 300;
     }
+
+    // private async getOoklaSpeedtestResult(): Promise<AsusWRTOoklaSpeedtestResult> {
+    //     const logDescription = `[getOoklaSpeedtestResult]`;
+    //
+    // }
 
     public async startOoklaSpeedtest(ooklaServer: AsusWRTOoklaServer): Promise<boolean> {
         const logDescription = `[startOoklaSpeedtest]`;
         const path = '/ookla_speedtest_exe.cgi';
         this.debugLog(`${logDescription}`, ooklaServer);
-        try {
-            const setStartTimeResponse = await this.setOoklaSpeedtestStartTime();
-            if (!setStartTimeResponse) {
-                return false;
-            }
-            const response = await fetch(`${this.options.BaseUrl}${path}`, {
-                method: 'POST',
-                body: new URLSearchParams({
-                    type: '',
-                    id: `${ooklaServer.id}`
-                }),
-                headers: await this.getDefaultHeadersIncludingToken(this.options.BaseUrl)
+        const setStartTimeResponse = await this.setOoklaSpeedtestStartTime();
+        if (!setStartTimeResponse) {
+            return false;
+        }
+        const response = await this.ax.request({
+            baseURL: this.options.BaseUrl,
+            url: path,
+            method: 'POST',
+            data: new URLSearchParams({
+                type: '',
+                id: `${ooklaServer.id}`
             })
-            return this.checkStatus(response);
-        } catch (err) {
-            this.errorLog(`${logDescription}`, err);
-            throw new Error(`${logDescription} ${err}`);
-        }
-    }
-
-    private async getDefaultHeadersIncludingToken(baseUrl: string): Promise<any> {
-        const logDescription = `[getDefaultHeadersIncludingToken]`;
-        this.debugLog(`${logDescription}`, baseUrl);
-        return  {
-            'Content-Type': 'application/x-www-form-urlencoded',
-            'Cookie': `asus_token=${await this.getToken(baseUrl)}`,
-            'User-Agent': 'asusrouter-Android-DUTUtil-1.0.0.3.58-163'
-        }
+        });
+        return response.status >= 200 && response.status < 300;
     }
 
     private getCPUUsagePercentage(cpuUsageObj: any): number {
@@ -619,25 +641,5 @@ export class AsusWRT {
         const totalMemory = parseInt(memoryUsageObj.mem_total);
         const memUsed = parseInt(memoryUsageObj.mem_used);
         return (100 / totalMemory) * memUsed;
-    }
-
-    private async checkStatus(response: Response): Promise<boolean> {
-        const logDescription = `[checkStatus]`;
-        if (response.ok) {
-            this.debugLog(`${logDescription} OK: `, response.status);
-            const clonedResponse = await response.clone().text();
-            if (clonedResponse.includes('error_status')) {
-                const clonedResponseJson = JSON.parse(clonedResponse);
-                if (clonedResponseJson.error_status) {
-                    this.errorLog(`${logDescription} NOT OK: ${response.status} desc: `, clonedResponseJson.error_status);
-                    this.dispose();
-                    throw new Error(`${logDescription} NOT OK: ${response.status} error status: ${clonedResponseJson.error_status}`)
-                }
-            }
-            return true;
-        } else {
-            this.errorLog(`${logDescription} NOT OK: ${response.status} desc: `, response.statusText);
-            throw new Error(`${logDescription} NOT OK: ${response.status} desc: ${response.statusText}`)
-        }
     }
 }
