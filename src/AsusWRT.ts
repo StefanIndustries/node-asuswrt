@@ -493,11 +493,10 @@ export class AsusWRT {
         this.debugLog(`${logDescription}`, routerMac);
         try {
             const uptimeData = await this.appGet('uptime()', this.macIpBinding.get(routerMac));
-            if (uptimeData && typeof uptimeData === 'string') {
-                let uptimeSeconds = uptimeData.substring(uptimeData.indexOf(':'));
-                uptimeSeconds = uptimeSeconds.substring(uptimeSeconds.indexOf("(") + 1);
-                uptimeSeconds = uptimeSeconds.substring(0, uptimeSeconds.indexOf(" "));
-                return parseInt(uptimeSeconds);
+            const match = JSON.stringify(uptimeData).match(/(\d+) secs since boot/);
+            if (match) {
+                const seconds: string = match[1];
+                return parseInt(seconds);
             } else {
                 return 0;
             }
