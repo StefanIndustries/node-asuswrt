@@ -1,4 +1,4 @@
-export interface AsusWRTWANStatus {
+export interface AsusWanStatus {
     status?: number;
     statusstr?: string;
     type?: string;

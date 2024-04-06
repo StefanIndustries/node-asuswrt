@@ -1,6 +1,6 @@
-import {AsusWRTOperationMode} from "./AsusWRTOperationMode";
+import {AsusOperationMode} from "./asus-operation-mode";
 
-export interface AsusWRTRouter {
+export interface AsusRouter {
     alias: string,
     modelName: string,
     uiModelName: string,
@@ -10,5 +10,5 @@ export interface AsusWRTRouter {
     ip: string,
     mac: string,
     online: boolean,
-    operationMode: AsusWRTOperationMode
+    operationMode: AsusOperationMode
 }

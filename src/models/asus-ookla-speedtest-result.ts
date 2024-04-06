@@ -1,6 +1,6 @@
-import { AsusWRTOoklaServer } from "./AsusWRTOoklaServer";
+import { AsusOoklaServer } from "./asus-ookla-server";
 
-export interface AsusWRTOoklaSpeedtestResult {
+export interface AsusOoklaSpeedtestResult {
     type: string;
     timestamp: string;
     ping: {
@@ -28,7 +28,7 @@ export interface AsusWRTOoklaSpeedtestResult {
         isVpn: boolean;
         externalIp: string;
     },
-    server: AsusWRTOoklaServer,
+    server: AsusOoklaServer,
     result: {
         id: string;
         persisted: boolean;

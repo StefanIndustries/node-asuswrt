@@ -1,4 +1,4 @@
-export interface AsusWRTConnectedDevice {
+export interface AsusConnectedDevice {
     ip: string,
     mac: string,
     name: string,

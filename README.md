@@ -5,7 +5,7 @@ All async methods return promise based types and can be awaited.
 
 ## Example
 ```typescript
-import { AsusWRT } from "node-asuswrt";
+import { AsusWrt } from "node-asuswrt";
 
 const config = {
     Username: 'admin',
@@ -27,7 +27,7 @@ const config = {
     }
 }
 
-const asus = new AsusWRT.AsusWRT(config);
+const asus = new AsusWrt.AsusWrt(config);
 
 asus.getWANStatus().then(result => {
     console.log(result);
@@ -59,7 +59,7 @@ asus.getRouters().then(result => {
 
 ### Import the wrapper
 ```typescript
-import { AsusWRT } from "node-asuswrt";
+import { AsusWrt } from "node-asuswrt";
 ```
 
 ### Create a new instance of the wrapper
@@ -84,7 +84,7 @@ const config = {
     }
 }
 
-const asus = new AsusWRT.AsusWRT(config);
+const asus = new AsusWrt.AsusWrt(config);
 ```
 
 ### Get all routers in the network (async)
@@ -151,7 +151,7 @@ asus.wakeOnLan(wakeOnLanDeviceMac)
 ```
 
 ## Objects
-### AsusWRTConnectedDevice
+### AsusConnectedDevice
 ```typescript
 {
     ip: string,
@@ -165,7 +165,7 @@ asus.wakeOnLan(wakeOnLanDeviceMac)
 }
 ```
 
-### AsusWRTLoad
+### AsusLoad
 ```typescript
 {
     CPUUsagePercentage: number,
@@ -173,7 +173,7 @@ asus.wakeOnLan(wakeOnLanDeviceMac)
 }
 ```
 
-### AsusWRTOperationMode
+### AsusOperationMode
 ```typescript
 {
     Router: 0,
@@ -181,7 +181,7 @@ asus.wakeOnLan(wakeOnLanDeviceMac)
 }
 ```
 
-### AsusWRTRouter
+### AsusRouter
 ```typescript
 {
     alias: string,
@@ -193,11 +193,11 @@ asus.wakeOnLan(wakeOnLanDeviceMac)
     ip: string,
     mac: string,
     online: boolean,
-    operationMode: AsusWRTOperationMode
+    operationMode: AsusOperationMode
 }
 ```
 
-### AsusWRTTrafficData
+### AsusTrafficData
 ```typescript
 {
     trafficReceived: number;
@@ -205,7 +205,7 @@ asus.wakeOnLan(wakeOnLanDeviceMac)
 }
 ```
 
-### AsusWRTWANStatus
+### AsusWanStatus
 ```typescript
 {
     status?: number;
@@ -227,7 +227,7 @@ asus.wakeOnLan(wakeOnLanDeviceMac)
 }
 ```
 
-### AsusWRTWakeOnLanDevice
+### AsusWakeOnLanDevice
 ```typescript
 {
     name: string,
