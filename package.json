@@ -7,7 +7,6 @@
   "scripts": {
     "build": "tsc",
     "lint": "npx eslint ./src",
-    "run-mjs": "node --env-file=.env app.mjs",
     "start": "tsx --env-file=.env --watch ./ts-app.ts"
   },
   "repository": {

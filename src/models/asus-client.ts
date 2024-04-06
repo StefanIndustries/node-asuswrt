@@ -1,7 +1,6 @@
 import {LoginResult} from "./responses/login-result";
 import {AxiosInstance, AxiosResponse} from "axios";
 import {URLSearchParams} from "node:url";
-import {AsusResponse} from "./responses/asus-response";
 
 export class AsusClient {
     asusToken: string = '';
@@ -11,8 +10,9 @@ export class AsusClient {
     username: string = '';
     password: string = '';
 
-    constructor(ax: AxiosInstance, ip: string, username: string, password: string) {
+    constructor(ax: AxiosInstance, ip: string, mac: string, username: string, password: string) {
         this.ip = ip;
+        this.mac = mac;
         this.axios = ax;
         this.username = username;
         this.password = password;
@@ -39,7 +39,7 @@ export class AsusClient {
         return loginResult.data;
     }
 
-    async appGet(payload: string): Promise<any> {
+    async appGet<T>(payload: string): Promise<T> {
         const path = '/appGet.cgi';
         const response = await this.axios.request({
             baseURL: this.ip,
@@ -54,11 +54,11 @@ export class AsusClient {
         });
         const result = response.data;
         try {
-            return JSON.parse(result);
+            return <T> JSON.parse(result);
         } catch (e) {
-            console.error(`failed to parse response: ${e}`);
+            console.log(`failed to parse response: ${e}`);
         }
-        return result;
+        return <T> result;
     }
 
     private async applyAppGET(payload: string): Promise<boolean> {
@@ -72,7 +72,6 @@ export class AsusClient {
     }
 
     private async applyAppPOST(payload: any): Promise<boolean> {
-        const logDescription = `[applyAppPOST]`;
         const path = '/applyapp.cgi';
         const response = await this.axios.request({
             baseURL: this.ip,

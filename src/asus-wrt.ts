@@ -1,14 +1,14 @@
-import axios, {AxiosInstance, AxiosResponse} from "axios";
+import axios, {AxiosInstance} from "axios";
 import {AsusOptions} from "./asus-options";
-import {AsusResponse} from "./models/responses/asus-response";
 import {AsusRouter} from "./models/asus-router";
 import { AsusAccessPoint } from "./models/asus-access-point";
 import {AsusClient} from "./models/asus-client";
+import {getCfgClientList} from "./models/responses/get-cfg-clientlist";
 
 export class AsusWrt {
     private readonly ax: AxiosInstance;
     private abortController = new AbortController();
-    private asusRouter: AsusRouter;
+    private asusRouter: AsusRouter | undefined = undefined;
     private asusAccessPoints: AsusAccessPoint[] = [];
     private allClients: AsusClient[] = [];
 
@@ -20,27 +20,34 @@ export class AsusWrt {
                 'User-Agent': 'asusrouter-Android-DUTUtil-1.0.0.3.58-163'
             }
         });
-
-        this.discoverClients().then(() => {
-            console.log('clients discovered');
-        });
     }
 
-    private async discoverClients() {
-        const client = new AsusClient(this.ax, this.options.baseURL, this.options.username, this.options.password);
+    public async discoverClients(): Promise<AsusClient[]> {
+        const client = new AsusClient(this.ax, this.options.baseURL, '', this.options.username, this.options.password);
         await client.authenticate();
-        const response = await client.appGet('get_cfg_clientlist()');
-        const clientList = response.get_cfg_clientlist;
-        console.log(clientList);
+        const response = await client.appGet<getCfgClientList>('get_cfg_clientlist()');
+        response.get_cfg_clientlist.forEach((client) => {
+            const formattedIp = this.options.baseURL!.includes('https://') ? `https://${client.ip}` : `http://${client.ip}`;
+            if (client.config.backhalctrl) {
+                const accessPoint = this.createAccessPoint(formattedIp, client.mac);
+                this.asusAccessPoints.push(accessPoint);
+                this.allClients.push(accessPoint);
+            } else {
+                this.asusRouter = this.createRouter(formattedIp, client.mac);
+                this.allClients.push(this.asusRouter);
+            }
+        });
+        return this.allClients;
     }
 
-    private createRouter(): AsusRouter {
-        return new AsusRouter(this.ax, this.options.baseURL, this.options.username, this.options.password);
+    public dispose(): void {
+        this.abortController.abort();
+        this.asusRouter = undefined;
+        this.asusAccessPoints = [];
+        this.allClients = [];
     }
 
-    private createAccessPoint(ip: string): AsusAccessPoint {
-        const accessPoint = new AsusAccessPoint(this.ax, ip, this.options.username, this.options.password);
-        this.asusAccessPoints.push(accessPoint);
-        return accessPoint;
-    }
+    private createRouter = (ip: string, mac: string): AsusRouter => new AsusRouter(this.ax, ip, mac, this.options.username, this.options.password);
+
+    private createAccessPoint = (ip: string, mac: string): AsusAccessPoint => new AsusAccessPoint(this.ax, ip, mac, this.options.username, this.options.password);
 }

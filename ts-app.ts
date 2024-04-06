@@ -6,6 +6,12 @@ async function main() {
         username: process.env["ASUSUSERNAME"]!,
         password: process.env["ASUSPASSWORD"]!,
     });
+
+    const clients = await asusWrt.discoverClients();
+    console.log(clients);
+
+
+    asusWrt.dispose();
 }
 
 main().then(() => {
