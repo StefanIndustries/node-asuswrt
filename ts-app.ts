@@ -10,8 +10,9 @@ async function main() {
     const clients = await asusWrt.discoverClients();
     console.log(clients);
 
-
-    asusWrt.dispose();
+    setTimeout(() => {
+        console.log(asusWrt.allClients);
+    }, 5000);
 }
 
 main().then(() => {

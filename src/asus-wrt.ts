@@ -8,9 +8,9 @@ import {getCfgClientList} from "./models/responses/get-cfg-clientlist";
 export class AsusWrt {
     private readonly ax: AxiosInstance;
     private abortController = new AbortController();
-    private asusRouter: AsusRouter | undefined = undefined;
-    private asusAccessPoints: AsusAccessPoint[] = [];
-    private allClients: AsusClient[] = [];
+    public asusRouter: AsusRouter | undefined = undefined;
+    public asusAccessPoints: AsusAccessPoint[] = [];
+    public allClients: AsusClient[] = [];
 
     constructor(private options: AsusOptions) {
         this.ax = axios.create({
@@ -19,6 +19,17 @@ export class AsusWrt {
             headers: {
                 'User-Agent': 'asusrouter-Android-DUTUtil-1.0.0.3.58-163'
             }
+        });
+
+        this.ax.interceptors.response.use(async (response) => {
+            if (response.config.url !== '/login.cgi' && response.data && response.data.error_status) {
+                const client = this.allClients.find((client) => client.ip === response.config.baseURL);
+                await client?.authenticate();
+                delete response.config.headers!['Cookie'];
+                response.config.headers!['Cookie'] = `asus_token=${client?.asusToken}`;
+                return this.ax.request(response.config);
+            }
+            return response;
         });
     }
 
