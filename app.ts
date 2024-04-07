@@ -8,10 +8,13 @@ async function main() {
     });
 
     const clients = await asusWrt.discoverClients();
-    for (const client of clients) {
-        const load = await client.getCPUMemoryLoad();
-        console.log(load);
-    }
+    const router = asusWrt.asusRouter!;
+    const trafficData = await router.getTotalTrafficData();
+    const wanStatus = await router.getWANStatus();
+    const wakeOnLanDevices = await router.getWakeOnLanDevices();
+    const vpnClients = await router.getVpnClients();
+    const ooklaServers = await router.getOoklaServers();
+    // const ooklaHistory = await router.getOoklaSpeedtestHistory(); // broken
 }
 
 main().then(() => {

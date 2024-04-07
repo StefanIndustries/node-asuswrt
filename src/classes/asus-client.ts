@@ -5,8 +5,11 @@ import {SystemUsage} from "../models/responses/system-usage";
 import {AppGetPayloads} from "../models/requests/app-get-payloads";
 import {ApplyAppPayloads} from "../models/requests/apply-app-payloads";
 import {ApplyAppPostPayloads} from "../models/requests/apply-app-post-payloads";
-import {appGetSystemUsageTransformer} from "../transformers/app-get-system-usage-transformer";
+import {systemUsageTransformer} from "../transformers/system-usage-transformer";
 import {AsusCpuMemLoad} from "../models/asus-cpu-mem-load";
+import {AppGetTransformer} from "../transformers/app-get-transformer";
+import {Uptime} from "../models/responses/uptime";
+import {uptimeTransformer} from "../transformers/uptime-transformer";
 
 export class AsusClient {
     asusToken: string = '';
@@ -45,21 +48,25 @@ export class AsusClient {
         return loginResult.data;
     }
 
-    async appGet<T, TT>(payload: AppGetPayloads, appGetTransformer: (data: T) => TT): Promise<TT> {
+    async appGet<T, TT>(payload: AppGetPayloads, appGetTransformer: AppGetTransformer<T, TT>): Promise<TT> {
         const path = '/appGet.cgi';
-        const response = await this.axios.request({
-            baseURL: this.ip,
-            url: path,
-            method: 'POST',
-            data: new URLSearchParams({
-                hook: payload
-            }),
-            headers: {
-                'Cookie': `asus_token=${this.asusToken}`
-            }
-        });
-        const result = response.data;
-        return appGetTransformer(<T> result);
+        try {
+            const response = await this.axios.request({
+                baseURL: this.ip,
+                url: path,
+                method: 'POST',
+                data: new URLSearchParams({
+                    hook: payload
+                }),
+                headers: {
+                    'Cookie': `asus_token=${this.asusToken}`
+                }
+            });
+            const result = response.data;
+            return appGetTransformer(<T> result);
+        } catch (err) {
+            throw new Error(`failed to get ${payload}: ${err}`);
+        }
     }
 
     async applyAppGET(payload: ApplyAppPayloads): Promise<boolean> {
@@ -87,10 +94,10 @@ export class AsusClient {
     }
 
     async getCPUMemoryLoad(): Promise<AsusCpuMemLoad> {
-        try {
-            return await this.appGet<SystemUsage, AsusCpuMemLoad>(AppGetPayloads.SystemUsage, appGetSystemUsageTransformer);
-        } catch (err) {
-            throw new Error(`failed to get CPU and memory load: ${err}`);
-        }
+        return await this.appGet<SystemUsage, AsusCpuMemLoad>(AppGetPayloads.SystemUsage, systemUsageTransformer);
+    }
+
+    async getUptimeSeconds(): Promise<number> {
+        return await this.appGet<Uptime, number>(AppGetPayloads.Uptime, uptimeTransformer);
     }
 }
