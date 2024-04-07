@@ -1,6 +1,12 @@
-import {LoginResult} from "./responses/login-result";
+import {LoginResult} from "../models/responses/login-result";
 import {AxiosInstance, AxiosResponse} from "axios";
 import {URLSearchParams} from "node:url";
+import {SystemUsage} from "../models/responses/system-usage";
+import {AppGetPayloads} from "../models/requests/app-get-payloads";
+import {ApplyAppPayloads} from "../models/requests/apply-app-payloads";
+import {ApplyAppPostPayloads} from "../models/requests/apply-app-post-payloads";
+import {appGetSystemUsageTransformer} from "../transformers/app-get-system-usage-transformer";
+import {AsusCpuMemLoad} from "../models/asus-cpu-mem-load";
 
 export class AsusClient {
     asusToken: string = '';
@@ -39,7 +45,7 @@ export class AsusClient {
         return loginResult.data;
     }
 
-    async appGet<T>(payload: string): Promise<T> {
+    async appGet<T, TT>(payload: AppGetPayloads, appGetTransformer: (data: T) => TT): Promise<TT> {
         const path = '/appGet.cgi';
         const response = await this.axios.request({
             baseURL: this.ip,
@@ -53,15 +59,10 @@ export class AsusClient {
             }
         });
         const result = response.data;
-        try {
-            return <T> JSON.parse(result);
-        } catch (e) {
-            console.log(`failed to parse response: ${e}`);
-        }
-        return <T> result;
+        return appGetTransformer(<T> result);
     }
 
-    private async applyAppGET(payload: string): Promise<boolean> {
+    async applyAppGET(payload: ApplyAppPayloads): Promise<boolean> {
         const path = '/applyapp.cgi';
         const response = await this.axios.request({
             baseURL: this.ip,
@@ -71,7 +72,7 @@ export class AsusClient {
         return response.status >= 200 && response.status < 300;
     }
 
-    private async applyAppPOST(payload: any): Promise<boolean> {
+    async applyAppPOST(payload: ApplyAppPostPayloads): Promise<boolean> {
         const path = '/applyapp.cgi';
         const response = await this.axios.request({
             baseURL: this.ip,
@@ -83,5 +84,13 @@ export class AsusClient {
             data: payload
         });
         return response.status >= 200 && response.status < 300;
+    }
+
+    async getCPUMemoryLoad(): Promise<AsusCpuMemLoad> {
+        try {
+            return await this.appGet<SystemUsage, AsusCpuMemLoad>(AppGetPayloads.SystemUsage, appGetSystemUsageTransformer);
+        } catch (err) {
+            throw new Error(`failed to get CPU and memory load: ${err}`);
+        }
     }
 }

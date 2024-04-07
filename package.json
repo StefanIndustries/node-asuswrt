@@ -7,7 +7,7 @@
   "scripts": {
     "build": "tsc",
     "lint": "npx eslint ./src",
-    "start": "tsx --env-file=.env --watch ./ts-app.ts"
+    "start": "tsx --env-file=.env --watch app.ts"
   },
   "repository": {
     "type": "git",

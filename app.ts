@@ -8,11 +8,10 @@ async function main() {
     });
 
     const clients = await asusWrt.discoverClients();
-    console.log(clients);
-
-    setTimeout(() => {
-        console.log(asusWrt.allClients);
-    }, 5000);
+    for (const client of clients) {
+        const load = await client.getCPUMemoryLoad();
+        console.log(load);
+    }
 }
 
 main().then(() => {

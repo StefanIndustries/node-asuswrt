@@ -1,9 +1,10 @@
 import axios, {AxiosInstance} from "axios";
 import {AsusOptions} from "./asus-options";
-import {AsusRouter} from "./models/asus-router";
-import { AsusAccessPoint } from "./models/asus-access-point";
-import {AsusClient} from "./models/asus-client";
+import {AsusRouter} from "./classes/asus-router";
+import {AsusAccessPoint} from "./classes/asus-access-point";
+import {AsusClient} from "./classes/asus-client";
 import {getCfgClientList} from "./models/responses/get-cfg-clientlist";
+import {AppGetPayloads} from "./models/requests/app-get-payloads";
 
 export class AsusWrt {
     private readonly ax: AxiosInstance;
@@ -36,19 +37,20 @@ export class AsusWrt {
     public async discoverClients(): Promise<AsusClient[]> {
         const client = new AsusClient(this.ax, this.options.baseURL, '', this.options.username, this.options.password);
         await client.authenticate();
-        const response = await client.appGet<getCfgClientList>('get_cfg_clientlist()');
-        response.get_cfg_clientlist.forEach((client) => {
-            const formattedIp = this.options.baseURL!.includes('https://') ? `https://${client.ip}` : `http://${client.ip}`;
-            if (client.config.backhalctrl) {
-                const accessPoint = this.createAccessPoint(formattedIp, client.mac);
-                this.asusAccessPoints.push(accessPoint);
-                this.allClients.push(accessPoint);
-            } else {
-                this.asusRouter = this.createRouter(formattedIp, client.mac);
-                this.allClients.push(this.asusRouter);
-            }
+        return await client.appGet<getCfgClientList, AsusClient[]>(AppGetPayloads.CfgClientList, (response) => {
+            response.get_cfg_clientlist.forEach((client) => {
+                const formattedIp = this.options.baseURL!.includes('https://') ? `https://${client.ip}` : `http://${client.ip}`;
+                if (client.config.backhalctrl) {
+                    const accessPoint = this.createAccessPoint(formattedIp, client.mac);
+                    this.asusAccessPoints.push(accessPoint);
+                    this.allClients.push(accessPoint);
+                } else {
+                    this.asusRouter = this.createRouter(formattedIp, client.mac);
+                    this.allClients.push(this.asusRouter);
+                }
+            });
+            return this.allClients;
         });
-        return this.allClients;
     }
 
     public dispose(): void {
