@@ -14,7 +14,8 @@ async function main() {
     const wakeOnLanDevices = await router.getWakeOnLanDevices();
     const vpnClients = await router.getVpnClients();
     const ooklaServers = await router.getOoklaServers();
-    // const ooklaHistory = await router.getOoklaSpeedtestHistory(); // broken
+    const speedTestResult = await router.runSpeedtest(ooklaServers[0]);
+    console.log(speedTestResult);
 }
 
 main().then(() => {

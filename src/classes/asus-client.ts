@@ -1,5 +1,5 @@
 import {LoginResult} from "../models/responses/login-result";
-import {AxiosInstance, AxiosResponse} from "axios";
+import {AxiosInstance, AxiosRequestConfig, AxiosResponse} from "axios";
 import {URLSearchParams} from "node:url";
 import {SystemUsage} from "../models/responses/system-usage";
 import {AppGetPayloads} from "../models/requests/app-get-payloads";
@@ -10,6 +10,8 @@ import {AsusCpuMemLoad} from "../models/asus-cpu-mem-load";
 import {AppGetTransformer} from "../transformers/app-get-transformer";
 import {Uptime} from "../models/responses/uptime";
 import {uptimeTransformer} from "../transformers/uptime-transformer";
+import {AsusOoklaSpeedtestResult} from "../models/asus-ookla-speedtest-result";
+import {AsusOoklaServer} from "../models/asus-ookla-server";
 
 export class AsusClient {
     asusToken: string = '';
@@ -91,6 +93,10 @@ export class AsusClient {
             data: payload
         });
         return response.status >= 200 && response.status < 300;
+    }
+
+    async customAxRequest(request: AxiosRequestConfig): Promise<AxiosResponse> {
+        return await this.axios.request(request);
     }
 
     async getCPUMemoryLoad(): Promise<AsusCpuMemLoad> {

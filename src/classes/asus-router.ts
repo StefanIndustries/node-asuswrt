@@ -49,8 +49,74 @@ export class AsusRouter extends AsusClient {
         return await this.appGet<OoklaSpeedtestServers, AsusOoklaServer[]>(AppGetPayloads.OoklaServers, OoklaSpeedtestServersTransformer);
     }
 
-    // broken for now.
-    // async getOoklaSpeedtestHistory(): Promise<AsusOoklaSpeedtestResult[]> {
-    //     return await this.appGet<OoklaSpeedtestHistory, AsusOoklaSpeedtestResult[]>(AppGetPayloads.OoklaSpeedtestHistory, OoklaSpeedtestHistoryTransformer);
-    // }
+    async getOoklaSpeedtestHistory(): Promise<AsusOoklaSpeedtestResult[]> {
+        return await this.appGet<OoklaSpeedtestHistory, AsusOoklaSpeedtestResult[]>(AppGetPayloads.OoklaSpeedtestHistory, OoklaSpeedtestHistoryTransformer);
+    }
+
+    async runSpeedtest(ooklaServer: AsusOoklaServer): Promise<AsusOoklaSpeedtestResult> {
+        let history: AsusOoklaSpeedtestResult[] = [];
+        try {
+            history = await this.getOoklaSpeedtestHistory();
+        } catch (e) {
+            console.log('History is broken. writing empty history on next result');
+        }
+        await this.setOoklaSpeedtestStartTime();
+        await this.startOoklaSpeedtest(ooklaServer);
+        const result = await this.getOoklaSpeedtestResult();
+        await this.writeOoklaSpeedtestResult(history, result);
+        return result;
+    }
+
+    private async setOoklaSpeedtestStartTime(): Promise<boolean> {
+        const response = await this.customAxRequest({
+            baseURL: this.ip,
+            url: '/set_ookla_speedtest_start_time.cgi',
+            method: 'POST',
+            data: new URLSearchParams({
+                ookla_start_time: Date.now().toString()
+            })
+        });
+        return response.status >= 200 && response.status < 300;
+    }
+
+    private async startOoklaSpeedtest(ooklaServer: AsusOoklaServer): Promise<boolean> {
+        const response = await this.customAxRequest({
+            baseURL: this.ip,
+            url: `/ookla_speedtest_exe.cgi`,
+            method: 'POST',
+            data: new URLSearchParams({
+                type: '',
+                id: `${ooklaServer.id}`
+            })
+        });
+        return response.status >= 200 && response.status < 300;
+    }
+
+    private async getOoklaSpeedtestResult(): Promise<AsusOoklaSpeedtestResult> {
+        let nRetrieveResultAttempts = 0;
+        while(nRetrieveResultAttempts < 30) {
+            nRetrieveResultAttempts++;
+            const data = await this.appGet<any, any>(AppGetPayloads.OoklaSpeedtestResult, (data: any) => data);
+            const resultFound: AsusOoklaSpeedtestResult = data.ookla_speedtest_get_result.find((element: any) => element.type === 'result');
+            if (resultFound) {
+                return resultFound;
+            }
+            await new Promise(resolve => setTimeout(resolve, 1000));
+        }
+        throw new Error(`unable to retrieve speedtest result`);
+    }
+
+    private async writeOoklaSpeedtestResult(history: AsusOoklaSpeedtestResult[], result: AsusOoklaSpeedtestResult): Promise<boolean> {
+        const rebuiltHistory = history.map((element) => JSON.stringify(element)).join(`\n`);
+        const resultString = JSON.stringify(result);
+        const uglyJsonString = history.length > 0 ? `${resultString}\n${rebuiltHistory}` : resultString;
+        const requestBody = new URLSearchParams({ speedTest_history: uglyJsonString });
+        const response = await this.customAxRequest({
+            url: '/ookla_speedtest_write_history.cgi',
+            method: 'POST',
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+            data: requestBody
+        });
+        return response.status >= 200 && response.status < 300;
+    }
 }
