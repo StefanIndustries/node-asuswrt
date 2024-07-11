@@ -11,6 +11,7 @@ import { AsusWRTCache } from "./models/AsusWRTCache";
 import axios, { AxiosInstance } from "axios";
 import { AsusWRTOoklaSpeedtestResult } from "./models/AsusWRTOoklaSpeedtestResult";
 import { AsusWRTVPNClient } from "./models/AsusWRTVPNClient";
+import https from "node:https";
 
 export class AsusWRT {
     private ax: AxiosInstance;
@@ -24,7 +25,8 @@ export class AsusWRT {
             baseURL: options.BaseUrl,
             timeout: 30000,
             signal: this.abortController.signal,
-            headers: { 'User-Agent': 'asusrouter-Android-DUTUtil-1.0.0.3.58-163' }
+            headers: { 'User-Agent': 'asusrouter-Android-DUTUtil-1.0.0.3.58-163' },
+            httpsAgent: new https.Agent({rejectUnauthorized: !options.IsSelfSignedCertificate}),
         });
 
         // interceptor to add token to request
