@@ -150,6 +150,14 @@ asus.getWakeOnLanList()
 asus.wakeOnLan(wakeOnLanDeviceMac)
 ```
 
+### Run export certificate (async)
+```typescript
+// `npm install fs.promises` for writeFile
+asus.exportCertificate().then(result => {
+    writeFile('./cert_key.tar', result);
+});
+```
+
 ## Objects
 ### AsusWRTConnectedDevice
 ```typescript
