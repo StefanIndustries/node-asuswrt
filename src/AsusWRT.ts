@@ -730,4 +730,18 @@ export class AsusWRT {
         const memUsed = parseInt(memoryUsageObj.mem_used);
         return (100 / totalMemory) * memUsed;
     }
+
+    private async exportCertificate(routerIP?: string):  Promise<any> {
+        const logDescription = `[exportCertificate]`;
+        const path = '/cert_key.tar';
+        const url = routerIP ? routerIP : this.options.BaseUrl;
+        this.debugLog(`${logDescription} ${url} ${path}`);
+        const response = await this.ax.request({
+            baseURL: url,
+            url: path,
+            method: 'GET',
+            responseType: "stream"
+        });
+        return response.data;
+    }
 }
