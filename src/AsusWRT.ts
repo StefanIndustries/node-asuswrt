@@ -11,7 +11,7 @@ import { AsusWRTCache } from "./models/AsusWRTCache";
 import axios, { AxiosInstance } from "axios";
 import { AsusWRTOoklaSpeedtestResult } from "./models/AsusWRTOoklaSpeedtestResult";
 import { AsusWRTVPNClient } from "./models/AsusWRTVPNClient";
-import https from "node:https";
+import * as https from "node:https";
 
 export class AsusWRT {
     private ax: AxiosInstance;
