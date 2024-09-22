@@ -99,7 +99,7 @@ export class AsusWrt {
     }
 
     private mapClientToAsusClient(clientEntry: ClientEntry, connectionType: ConnectionMethod) : AsusConnectedDevice {
-        return {
+        return <AsusConnectedDevice> {
             connectionMethod: connectionType,
             dpiDevice: clientEntry.dpiDevice,
             ip: clientEntry.ip,
