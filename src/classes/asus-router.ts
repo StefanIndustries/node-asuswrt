@@ -18,10 +18,11 @@ import {OoklaSpeedtestServersTransformer} from "../transformers/ookla-speedtest-
 import {OoklaSpeedtestHistory} from "../models/responses/ookla-speedtest-history";
 import {AsusOoklaSpeedtestResult} from "../models/asus-ookla-speedtest-result";
 import {OoklaSpeedtestHistoryTransformer} from "../transformers/ookla-speedtest-history-transformer";
+import {RebootNetworkPayload} from "../models/requests/apply-app-payloads";
 
 export class AsusRouter extends AsusClient {
-    constructor(ax: AxiosInstance, ip: string, mac: string, username: string, password: string) {
-        super(ax, ip, mac, username, password);
+    constructor(ax: AxiosInstance, url: string, mac: string, username: string, password: string) {
+        super(ax, url, mac, username, password);
         super.authenticate().then(() => {
             console.log('router authenticated');
         }).catch((e) => {
@@ -53,11 +54,22 @@ export class AsusRouter extends AsusClient {
         return await this.appGet<OoklaSpeedtestHistory, AsusOoklaSpeedtestResult[]>(AppGetPayloads.OoklaSpeedtestHistory, OoklaSpeedtestHistoryTransformer);
     }
 
+    async getCertificate(): Promise<any> {
+        const response = await this.customAxRequest({
+            baseURL: this.url,
+            url: '/cert_key.tar',
+            method: 'GET',
+            responseType: "stream"
+        });
+        return response.data;
+    }
+
     async runSpeedtest(ooklaServer: AsusOoklaServer): Promise<AsusOoklaSpeedtestResult> {
         let history: AsusOoklaSpeedtestResult[] = [];
         try {
             history = await this.getOoklaSpeedtestHistory();
         } catch (e) {
+            console.log(e);
             console.log('History is broken. writing empty history on next result');
         }
         await this.setOoklaSpeedtestStartTime();
@@ -67,9 +79,13 @@ export class AsusRouter extends AsusClient {
         return result;
     }
 
+    async rebootNetwork(): Promise<boolean> {
+        return await this.applyAppPOST(RebootNetworkPayload());
+    }
+
     private async setOoklaSpeedtestStartTime(): Promise<boolean> {
         const response = await this.customAxRequest({
-            baseURL: this.ip,
+            baseURL: this.url,
             url: '/set_ookla_speedtest_start_time.cgi',
             method: 'POST',
             data: new URLSearchParams({
@@ -81,7 +97,7 @@ export class AsusRouter extends AsusClient {
 
     private async startOoklaSpeedtest(ooklaServer: AsusOoklaServer): Promise<boolean> {
         const response = await this.customAxRequest({
-            baseURL: this.ip,
+            baseURL: this.url,
             url: `/ookla_speedtest_exe.cgi`,
             method: 'POST',
             data: new URLSearchParams({

@@ -2,7 +2,7 @@ import {Wollist} from "../models/responses/wollist";
 import {AsusWakeOnLanDevice} from "../models/asus-wake-on-lan-device";
 
 export function wollistTransformer(wollist: Wollist): AsusWakeOnLanDevice[] {
-    let wolClients: AsusWakeOnLanDevice[] = [];
+    const wolClients: AsusWakeOnLanDevice[] = [];
     const wollistUnsplitted = wollist.wollist;
     const wollistSplitted = wollistUnsplitted.split('&#60');
     if (wollistSplitted.length > 0) {

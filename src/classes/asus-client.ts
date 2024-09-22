@@ -3,26 +3,23 @@ import {AxiosInstance, AxiosRequestConfig, AxiosResponse} from "axios";
 import {URLSearchParams} from "node:url";
 import {SystemUsage} from "../models/responses/system-usage";
 import {AppGetPayloads} from "../models/requests/app-get-payloads";
-import {ApplyAppPayloads} from "../models/requests/apply-app-payloads";
-import {ApplyAppPostPayloads} from "../models/requests/apply-app-post-payloads";
 import {systemUsageTransformer} from "../transformers/system-usage-transformer";
 import {AsusCpuMemLoad} from "../models/asus-cpu-mem-load";
 import {AppGetTransformer} from "../transformers/app-get-transformer";
 import {Uptime} from "../models/responses/uptime";
 import {uptimeTransformer} from "../transformers/uptime-transformer";
-import {AsusOoklaSpeedtestResult} from "../models/asus-ookla-speedtest-result";
-import {AsusOoklaServer} from "../models/asus-ookla-server";
+import {RebootNodePayload, SetLedsPayload} from "../models/requests/apply-app-payloads";
 
 export class AsusClient {
     asusToken: string = '';
-    ip: string = '';
+    url: string = '';
     mac: string = '';
     axios: AxiosInstance;
     username: string = '';
     password: string = '';
 
-    constructor(ax: AxiosInstance, ip: string, mac: string, username: string, password: string) {
-        this.ip = ip;
+    constructor(ax: AxiosInstance, url: string, mac: string, username: string, password: string) {
+        this.url = url;
         this.mac = mac;
         this.axios = ax;
         this.username = username;
@@ -34,7 +31,7 @@ export class AsusClient {
         const formattedUsernamePassword = Buffer.from(`${this.username}:${this.password}`).toString('base64');
         const loginResult = <AxiosResponse<LoginResult>> await this.axios.request({
             method: 'POST',
-            baseURL: this.ip,
+            baseURL: this.url,
             url: path,
             data: new URLSearchParams({
                 login_authorization: formattedUsernamePassword
@@ -54,7 +51,7 @@ export class AsusClient {
         const path = '/appGet.cgi';
         try {
             const response = await this.axios.request({
-                baseURL: this.ip,
+                baseURL: this.url,
                 url: path,
                 method: 'POST',
                 data: new URLSearchParams({
@@ -71,26 +68,25 @@ export class AsusClient {
         }
     }
 
-    async applyAppGET(payload: ApplyAppPayloads): Promise<boolean> {
+    async applyAppPOST(payload: URLSearchParams): Promise<boolean> {
         const path = '/applyapp.cgi';
         const response = await this.axios.request({
-            baseURL: this.ip,
-            url: `${path}?${payload}`,
-            method: 'GET',
-        });
-        return response.status >= 200 && response.status < 300;
-    }
-
-    async applyAppPOST(payload: ApplyAppPostPayloads): Promise<boolean> {
-        const path = '/applyapp.cgi';
-        const response = await this.axios.request({
-            baseURL: this.ip,
             url: path,
             method: 'POST',
             headers: {
                 'Content-Type': 'application/x-www-form-urlencoded'
             },
-            data: payload
+            data: payload.toString()
+        });
+        return response.status >= 200 && response.status < 300;
+    }
+
+    async applyAppGET(payload: string): Promise<boolean> {
+        const path = '/applyapp.cgi';
+        const response = await this.axios.request({
+            baseURL: this.url,
+            url: `${path}?${payload}`,
+            method: 'GET',
         });
         return response.status >= 200 && response.status < 300;
     }
@@ -105,5 +101,13 @@ export class AsusClient {
 
     async getUptimeSeconds(): Promise<number> {
         return await this.appGet<Uptime, number>(AppGetPayloads.Uptime, uptimeTransformer);
+    }
+
+    async setLeds(enabled: boolean): Promise<boolean> {
+        return await this.applyAppPOST(SetLedsPayload(enabled, this.mac));
+    }
+
+    async reboot(): Promise<boolean> {
+        return await this.applyAppPOST(RebootNodePayload(this.mac));
     }
 }
