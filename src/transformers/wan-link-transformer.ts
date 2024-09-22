@@ -1,4 +1,4 @@
-import {AsusWanLinkStatus} from "../models/asus-wan-link-status";
+import { AsusWanLinkStatus } from "../models/asus-wan-link-status";
 
 export function wanLinkTransformer(wanLink: string): AsusWanLinkStatus {
     const status: any = {};

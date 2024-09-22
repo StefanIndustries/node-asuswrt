@@ -1,5 +1,3 @@
-import {AsusOoklaServer} from "./asus-ookla-server";
-
 export interface AsusOoklaSpeedtestResult {
     type: string;
     timestamp: string;

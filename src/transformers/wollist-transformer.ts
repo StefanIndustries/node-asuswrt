@@ -1,5 +1,5 @@
-import {Wollist} from "../models/responses/wollist";
-import {AsusWakeOnLanDevice} from "../models/asus-wake-on-lan-device";
+import { Wollist } from "../models/responses/wollist";
+import { AsusWakeOnLanDevice } from "../models/asus-wake-on-lan-device";
 
 export function wollistTransformer(wollist: Wollist): AsusWakeOnLanDevice[] {
     const wolClients: AsusWakeOnLanDevice[] = [];

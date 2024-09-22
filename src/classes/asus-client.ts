@@ -1,15 +1,15 @@
-import {LoginResult} from "../models/responses/login-result";
-import {AxiosInstance, AxiosRequestConfig, AxiosResponse} from "axios";
-import {URLSearchParams} from "node:url";
-import {SystemUsage} from "../models/responses/system-usage";
-import {AppGetPayloads} from "../models/requests/app-get-payloads";
-import {systemUsageTransformer} from "../transformers/system-usage-transformer";
-import {AsusCpuMemLoad} from "../models/asus-cpu-mem-load";
-import {AppGetTransformer} from "../transformers/app-get-transformer";
-import {Uptime} from "../models/responses/uptime";
-import {uptimeTransformer} from "../transformers/uptime-transformer";
-import {RebootNodePayload, SetLedsPayload} from "../models/requests/apply-app-payloads";
-import {AsusConnectedDevice} from "../models/asus-connected-device";
+import { LoginResult } from "../models/responses/login-result";
+import { AxiosInstance, AxiosRequestConfig, AxiosResponse } from "axios";
+import { URLSearchParams } from "node:url";
+import { SystemUsage } from "../models/responses/system-usage";
+import { AppGetPayloads } from "../models/requests/app-get-payloads";
+import { systemUsageTransformer } from "../transformers/system-usage-transformer";
+import { AsusCpuMemLoad } from "../models/asus-cpu-mem-load";
+import { AppGetTransformer } from "../transformers/app-get-transformer";
+import { Uptime } from "../models/responses/uptime";
+import { uptimeTransformer } from "../transformers/uptime-transformer";
+import { RebootNodePayload, SetLedsPayload } from "../models/requests/apply-app-payloads";
+import { AsusConnectedDevice } from "../models/asus-connected-device";
 
 export class AsusClient {
     asusToken: string = '';
@@ -31,7 +31,7 @@ export class AsusClient {
     async authenticate(): Promise<LoginResult> {
         const path = '/login.cgi';
         const formattedUsernamePassword = Buffer.from(`${this.username}:${this.password}`).toString('base64');
-        const loginResult = <AxiosResponse<LoginResult>> await this.axios.request({
+        const loginResult = <AxiosResponse<LoginResult>>await this.axios.request({
             method: 'POST',
             baseURL: this.url,
             url: path,
@@ -65,7 +65,7 @@ export class AsusClient {
             });
             const result = response.data;
             if (appGetTransformer) {
-                return appGetTransformer(<T> result);
+                return appGetTransformer(<T>result);
             } else {
                 return result;
             }

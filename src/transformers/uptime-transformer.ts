@@ -1,4 +1,4 @@
-import {Uptime} from "../models/responses/uptime";
+import { Uptime } from "../models/responses/uptime";
 
 export function uptimeTransformer(uptime: Uptime): number {
     const match = JSON.stringify(uptime).match(/(\d+) secs since boot/);

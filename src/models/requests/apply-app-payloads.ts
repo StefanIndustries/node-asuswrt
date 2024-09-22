@@ -1,9 +1,9 @@
-import {AsusVpnClient} from "../asus-vpn-client";
-import {AsusWakeOnLanDevice} from "../asus-wake-on-lan-device";
+import { AsusVpnClient } from "../asus-vpn-client";
+import { AsusWakeOnLanDevice } from "../asus-wake-on-lan-device";
 
 export function SetLedsPayload(enabled: boolean, mac: string): URLSearchParams {
     return new URLSearchParams({
-        config: JSON.stringify({ "led_val": enabled ? 1 : 0 }),
+        config: JSON.stringify({"led_val": enabled ? 1 : 0}),
         re_mac: mac,
         action_mode: "config_changed"
     });

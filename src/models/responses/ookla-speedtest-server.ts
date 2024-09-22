@@ -1,4 +1,4 @@
-import {AsusResponse} from "./asus-response";
+import { AsusResponse } from "./asus-response";
 
 export interface OoklaSpeedtestServers extends AsusResponse {
     ookla_speedtest_get_servers: OoklaSpeedtestServer[];

@@ -1,20 +1,20 @@
-import axios, {AxiosInstance} from "axios";
-import {AsusOptions} from "./asus-options";
-import {AsusRouter} from "./classes/asus-router";
-import {AsusAccessPoint} from "./classes/asus-access-point";
-import {AsusClient} from "./classes/asus-client";
-import {getCfgClientList} from "./models/responses/get-cfg-clientlist";
-import {AppGetPayloads} from "./models/requests/app-get-payloads";
+import axios, { AxiosInstance } from "axios";
+import { AsusOptions } from "./asus-options";
+import { AsusRouter } from "./classes/asus-router";
+import { AsusAccessPoint } from "./classes/asus-access-point";
+import { AsusClient } from "./classes/asus-client";
+import { getCfgClientList } from "./models/responses/get-cfg-clientlist";
+import { AppGetPayloads } from "./models/requests/app-get-payloads";
 import * as https from "node:https";
-import {AsusConnectedDevice, ConnectionMethod} from "./models/asus-connected-device";
+import { AsusConnectedDevice, ConnectionMethod } from "./models/asus-connected-device";
 
 export class AsusWrt {
-    private readonly ax: AxiosInstance;
-    private abortController = new AbortController();
-    private mainClient: AsusClient | undefined = undefined;
     public asusRouter: AsusRouter | undefined = undefined;
     public asusAccessPoints: AsusAccessPoint[] = [];
     public allClients: AsusClient[] = [];
+    private readonly ax: AxiosInstance;
+    private abortController = new AbortController();
+    private mainClient: AsusClient | undefined = undefined;
 
     constructor(private options: AsusOptions) {
         this.ax = axios.create({
@@ -115,8 +115,8 @@ export class AsusWrt {
         this.mainClient = undefined;
     }
 
-    private mapClientToAsusClient(clientEntry: ClientEntry, connectionType: ConnectionMethod) : AsusConnectedDevice {
-        return <AsusConnectedDevice> {
+    private mapClientToAsusClient(clientEntry: ClientEntry, connectionType: ConnectionMethod): AsusConnectedDevice {
+        return <AsusConnectedDevice>{
             connectionMethod: connectionType,
             dpiDevice: clientEntry.dpiDevice,
             ip: clientEntry.ip,

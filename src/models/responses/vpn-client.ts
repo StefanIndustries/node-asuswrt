@@ -1,4 +1,4 @@
-import {AsusResponse} from "./asus-response";
+import { AsusResponse } from "./asus-response";
 
 export interface VpnClient extends AsusResponse {
     vpnc_clientlist: string;

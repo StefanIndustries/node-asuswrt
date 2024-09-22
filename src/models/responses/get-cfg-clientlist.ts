@@ -1,4 +1,4 @@
-import {AsusResponse} from "./asus-response";
+import { AsusResponse } from "./asus-response";
 
 export interface getCfgClientList extends AsusResponse {
     get_cfg_clientlist: DeviceList;
@@ -9,7 +9,11 @@ interface BandInfo {
 }
 
 interface Capability {
-    [key: string]: number | { Ver: number, Count: number, Ports: { [key: string]: { Def: number, Type: number, SubType: number, index: number, amas_ethernet: string } } };
+    [key: string]: number | {
+        Ver: number,
+        Count: number,
+        Ports: { [key: string]: { Def: number, Type: number, SubType: number, index: number, amas_ethernet: string } }
+    };
 }
 
 interface Config {

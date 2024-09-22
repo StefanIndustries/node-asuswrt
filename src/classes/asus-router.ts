@@ -1,29 +1,30 @@
-import {AxiosInstance} from "axios";
-import {AsusClient} from "./asus-client";
-import {AppGetPayloads} from "../models/requests/app-get-payloads";
-import {NetdevData} from "../models/responses/netdev-data";
-import {trafficDataTransformer} from "../transformers/traffic-data-transformer";
-import {AsusTrafficData} from "../models/asus-traffic-data";
-import {AsusWanLinkStatus} from "../models/asus-wan-link-status";
-import {wanLinkTransformer} from "../transformers/wan-link-transformer";
-import {Wollist} from "../models/responses/wollist";
-import {AsusWakeOnLanDevice} from "../models/asus-wake-on-lan-device";
-import {wollistTransformer} from "../transformers/wollist-transformer";
-import {VpnClient} from "../models/responses/vpn-client";
-import {AsusVpnClient} from "../models/asus-vpn-client";
-import {VpnClientTransformer} from "../transformers/vpn-client-transformer";
-import {AsusOoklaServer} from "../models/asus-ookla-server";
-import {OoklaSpeedtestServers} from "../models/responses/ookla-speedtest-server";
-import {OoklaSpeedtestServersTransformer} from "../transformers/ookla-speedtest-servers-transformer";
-import {OoklaSpeedtestHistory} from "../models/responses/ookla-speedtest-history";
-import {AsusOoklaSpeedtestResult} from "../models/asus-ookla-speedtest-result";
-import {OoklaSpeedtestHistoryTransformer} from "../transformers/ookla-speedtest-history-transformer";
-import {RebootNetworkPayload, SetActiveVPNPayload, WakeOnLanPayload} from "../models/requests/apply-app-payloads";
+import { AxiosInstance } from "axios";
+import { AsusClient } from "./asus-client";
+import { AppGetPayloads } from "../models/requests/app-get-payloads";
+import { NetdevData } from "../models/responses/netdev-data";
+import { trafficDataTransformer } from "../transformers/traffic-data-transformer";
+import { AsusTrafficData } from "../models/asus-traffic-data";
+import { AsusWanLinkStatus } from "../models/asus-wan-link-status";
+import { wanLinkTransformer } from "../transformers/wan-link-transformer";
+import { Wollist } from "../models/responses/wollist";
+import { AsusWakeOnLanDevice } from "../models/asus-wake-on-lan-device";
+import { wollistTransformer } from "../transformers/wollist-transformer";
+import { VpnClient } from "../models/responses/vpn-client";
+import { AsusVpnClient } from "../models/asus-vpn-client";
+import { VpnClientTransformer } from "../transformers/vpn-client-transformer";
+import { AsusOoklaServer } from "../models/asus-ookla-server";
+import { OoklaSpeedtestServers } from "../models/responses/ookla-speedtest-server";
+import { OoklaSpeedtestServersTransformer } from "../transformers/ookla-speedtest-servers-transformer";
+import { OoklaSpeedtestHistory } from "../models/responses/ookla-speedtest-history";
+import { AsusOoklaSpeedtestResult } from "../models/asus-ookla-speedtest-result";
+import { OoklaSpeedtestHistoryTransformer } from "../transformers/ookla-speedtest-history-transformer";
+import { RebootNetworkPayload, SetActiveVPNPayload, WakeOnLanPayload } from "../models/requests/apply-app-payloads";
 
 export class AsusRouter extends AsusClient {
     constructor(ax: AxiosInstance, url: string, mac: string, username: string, password: string) {
         super(ax, url, mac, username, password);
-        super.authenticate().then(() => {}).catch((e) => {
+        super.authenticate().then(() => {
+        }).catch((e) => {
             throw new Error(e);
         });
     }
@@ -180,7 +181,7 @@ export class AsusRouter extends AsusClient {
 
     private async getOoklaSpeedtestResult(): Promise<AsusOoklaSpeedtestResult> {
         let nRetrieveResultAttempts = 0;
-        while(nRetrieveResultAttempts < 30) {
+        while (nRetrieveResultAttempts < 30) {
             nRetrieveResultAttempts++;
             const data = await this.appGet<any, any>(AppGetPayloads.OoklaSpeedtestResult, (data: any) => data);
             const resultFound: AsusOoklaSpeedtestResult = data.ookla_speedtest_get_result.find((element: any) => element.type === 'result');
@@ -196,11 +197,11 @@ export class AsusRouter extends AsusClient {
         const rebuiltHistory = history.map((element) => JSON.stringify(element)).join(`\n`);
         const resultString = JSON.stringify(result);
         const uglyJsonString = history.length > 0 ? `${resultString}\n${rebuiltHistory}` : resultString;
-        const requestBody = new URLSearchParams({ speedTest_history: uglyJsonString });
+        const requestBody = new URLSearchParams({speedTest_history: uglyJsonString});
         const response = await this.customAxRequest({
             url: '/ookla_speedtest_write_history.cgi',
             method: 'POST',
-            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+            headers: {'Content-Type': 'application/x-www-form-urlencoded'},
             data: requestBody
         });
         return response.status >= 200 && response.status < 300;
