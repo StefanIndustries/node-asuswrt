@@ -40,6 +40,11 @@ export class AsusWrt {
         });
     }
 
+    /**
+     * Discover and authenticate clients, then retrieve and process the list of clients from the main client.
+     *
+     * @return {Promise<AsusClient[]>} A promise that resolves to a list of AsusClient instances.
+     */
     public async discoverClients(): Promise<AsusClient[]> {
         this.mainClient = new AsusClient(this.ax, this.options.baseURL, '', this.options.username, this.options.password);
         await this.mainClient.authenticate();
@@ -59,6 +64,13 @@ export class AsusWrt {
         });
     }
 
+    /**
+     * Updates the connected devices for all clients. This method retrieves data
+     * using the main client, attempts to map wired and wifi clients (both 2G and 5G),
+     * and updates the `connectedDevices` property for each client.
+     *
+     * @return {Promise<any>} A promise that resolves when the connected devices have been updated.
+     */
     public async updateConnectedDevices(): Promise<any> {
         await this.mainClient!.appGet<ClientList, any>(AppGetPayloads.ClientList, (response) => {
             const allConnectedClients = response.get_clientlist;
@@ -90,6 +102,11 @@ export class AsusWrt {
         });
     }
 
+    /**
+     * Disposes the current instance by aborting ongoing operations and clearing associated properties.
+     *
+     * @return {void} No return value.
+     */
     public dispose(): void {
         this.abortController.abort();
         this.asusRouter = undefined;

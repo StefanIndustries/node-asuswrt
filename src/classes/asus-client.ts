@@ -91,18 +91,39 @@ export class AsusClient {
         return await this.axios.request(request);
     }
 
+    /**
+     * Retrieves the current CPU and memory load statistics.
+     *
+     * @return {Promise<AsusCpuMemLoad>} A promise that resolves to an object containing CPU and memory load metrics.
+     */
     async getCPUMemoryLoad(): Promise<AsusCpuMemLoad> {
         return await this.appGet<SystemUsage, AsusCpuMemLoad>(AppGetPayloads.SystemUsage, systemUsageTransformer);
     }
 
+    /**
+     * Retrieves the uptime of the app in seconds.
+     *
+     * @return {Promise<number>} A promise that resolves with the uptime in seconds.
+     */
     async getUptimeSeconds(): Promise<number> {
         return await this.appGet<Uptime, number>(AppGetPayloads.Uptime, uptimeTransformer);
     }
 
+    /**
+     * Asynchronously sets the LED status for the device.
+     *
+     * @param {boolean} enabled - A boolean flag indicating whether the LEDs should be enabled (true) or disabled (false).
+     * @return {Promise<boolean>} A promise that resolves to a boolean indicating the success status of the operation.
+     */
     async setLeds(enabled: boolean): Promise<boolean> {
         return await this.applyAppPOST(SetLedsPayload(enabled, this.mac));
     }
 
+    /**
+     * Reboots the node associated with the current instance.
+     *
+     * @return {Promise<boolean>} A promise that resolves to a boolean indicating the success of the reboot operation.
+     */
     async reboot(): Promise<boolean> {
         return await this.applyAppPOST(RebootNodePayload(this.mac));
     }

@@ -28,26 +28,58 @@ export class AsusRouter extends AsusClient {
         });
     }
 
+    /**
+     * Fetches the total traffic data from the application.
+     *
+     * @return {Promise<AsusTrafficData>} A promise that resolves with the total traffic data.
+     */
     async getTotalTrafficData(): Promise<AsusTrafficData> {
         return await this.appGet<NetdevData, AsusTrafficData>(AppGetPayloads.TrafficData, trafficDataTransformer);
     }
 
+    /**
+     * Fetches the status of the Wide Area Network (WAN) connection.
+     *
+     * @return {Promise<AsusWanLinkStatus>} A promise that resolves to the status of the WAN connection.
+     */
     async getWANStatus(): Promise<AsusWanLinkStatus> {
         return await this.appGet<string, AsusWanLinkStatus>(AppGetPayloads.WANStatus, wanLinkTransformer);
     }
 
+    /**
+     * Retrieves the list of Wake-on-LAN devices.
+     *
+     * @return {Promise<AsusWakeOnLanDevice[]>} A promise that resolves to an array of AsusWakeOnLanDevice objects.
+     */
     async getWakeOnLanDevices(): Promise<AsusWakeOnLanDevice[]> {
         return await this.appGet<Wollist, AsusWakeOnLanDevice[]>(AppGetPayloads.WakeOnLanList, wollistTransformer);
     }
 
+    /**
+     * Sends a Wake-on-LAN (WoL) request to the specified device.
+     *
+     * @param {AsusWakeOnLanDevice} wolDevice - The Wake-on-LAN device information required to send the request.
+     * @return {Promise<boolean>} A promise that resolves to a boolean indicating the success of the WoL request.
+     */
     async callWakeOnLan(wolDevice: AsusWakeOnLanDevice): Promise<boolean> {
         return await this.applyAppPOST(WakeOnLanPayload(wolDevice));
     }
 
+    /**
+     * Retrieves a list of VPN clients.
+     *
+     * @return {Promise<AsusVpnClient[]>} A promise that resolves to an array of AsusVpnClient objects representing the VPN clients.
+     */
     async getVpnClients(): Promise<AsusVpnClient[]> {
         return await this.appGet<VpnClient, AsusVpnClient[]>(AppGetPayloads.VpnClients, VpnClientTransformer);
     }
 
+    /**
+     * Sets the active VPN client for the application. If no client is provided, the current active VPN client is set.
+     *
+     * @param {AsusVpnClient} [client] - An optional parameter representing the Asus VPN client to be set as active.
+     * @return {Promise<boolean>} A promise that resolves to a boolean indicating whether the operation was successful.
+     */
     async setActiveVpnClient(client?: AsusVpnClient): Promise<boolean> {
         if (client) {
             return await this.applyAppPOST(SetActiveVPNPayload(client));
@@ -56,14 +88,29 @@ export class AsusRouter extends AsusClient {
         }
     }
 
+    /**
+     * Retrieves a list of Ookla servers.
+     *
+     * @return {Promise<AsusOoklaServer[]>} A promise that resolves to an array of AsusOoklaServers.
+     */
     async getOoklaServers(): Promise<AsusOoklaServer[]> {
         return await this.appGet<OoklaSpeedtestServers, AsusOoklaServer[]>(AppGetPayloads.OoklaServers, OoklaSpeedtestServersTransformer);
     }
 
+    /**
+     * Retrieves the history of Ookla speed tests.
+     *
+     * @return {Promise<AsusOoklaSpeedtestResult[]>} A promise that resolves to an array of AsusOoklaSpeedtestResult objects representing the speed test history.
+     */
     async getOoklaSpeedtestHistory(): Promise<AsusOoklaSpeedtestResult[]> {
         return await this.appGet<OoklaSpeedtestHistory, AsusOoklaSpeedtestResult[]>(AppGetPayloads.OoklaSpeedtestHistory, OoklaSpeedtestHistoryTransformer);
     }
 
+    /**
+     * Fetches the certificate from the specified endpoint.
+     *
+     * @return {Promise<any>} A promise that resolves to the retrieved certificate data in a stream format.
+     */
     async getCertificate(): Promise<any> {
         const response = await this.customAxRequest({
             baseURL: this.url,
@@ -74,6 +121,13 @@ export class AsusRouter extends AsusClient {
         return response.data;
     }
 
+    /**
+     * Runs a speedtest using the specified Ookla server, updates the history,
+     * and returns the result.
+     *
+     * @param {AsusOoklaServer} ooklaServer - The server to be used for the speedtest.
+     * @return {Promise<AsusOoklaSpeedtestResult>} The result of the speedtest.
+     */
     async runSpeedtest(ooklaServer: AsusOoklaServer): Promise<AsusOoklaSpeedtestResult> {
         let history: AsusOoklaSpeedtestResult[] = [];
         try {
@@ -89,6 +143,12 @@ export class AsusRouter extends AsusClient {
         return result;
     }
 
+    /**
+     * Initiates a network reboot by triggering the appropriate API call.
+     *
+     * @return {Promise<boolean>} A promise that resolves to true if the reboot command was successfully
+     *                            issued, otherwise false.
+     */
     async rebootNetwork(): Promise<boolean> {
         return await this.applyAppPOST(RebootNetworkPayload());
     }
