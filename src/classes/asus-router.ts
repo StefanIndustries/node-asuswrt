@@ -18,7 +18,7 @@ import {OoklaSpeedtestServersTransformer} from "../transformers/ookla-speedtest-
 import {OoklaSpeedtestHistory} from "../models/responses/ookla-speedtest-history";
 import {AsusOoklaSpeedtestResult} from "../models/asus-ookla-speedtest-result";
 import {OoklaSpeedtestHistoryTransformer} from "../transformers/ookla-speedtest-history-transformer";
-import {RebootNetworkPayload} from "../models/requests/apply-app-payloads";
+import {RebootNetworkPayload, SetActiveVPNPayload} from "../models/requests/apply-app-payloads";
 
 export class AsusRouter extends AsusClient {
     constructor(ax: AxiosInstance, url: string, mac: string, username: string, password: string) {
@@ -44,6 +44,14 @@ export class AsusRouter extends AsusClient {
 
     async getVpnClients(): Promise<AsusVpnClient[]> {
         return await this.appGet<VpnClient, AsusVpnClient[]>(AppGetPayloads.VpnClients, VpnClientTransformer);
+    }
+
+    async setActiveVpnClient(client?: AsusVpnClient): Promise<boolean> {
+        if (client) {
+            return await this.applyAppPOST(SetActiveVPNPayload(client));
+        } else {
+            return await this.applyAppPOST(SetActiveVPNPayload());
+        }
     }
 
     async getOoklaServers(): Promise<AsusOoklaServer[]> {

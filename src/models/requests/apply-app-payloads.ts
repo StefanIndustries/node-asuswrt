@@ -1,3 +1,5 @@
+import {AsusVpnClient} from "../asus-vpn-client";
+
 export function SetLedsPayload(enabled: boolean, mac: string): URLSearchParams {
     return new URLSearchParams({
         config: JSON.stringify({ "led_val": enabled ? 1 : 0 }),
@@ -17,4 +19,30 @@ export function RebootNetworkPayload(): URLSearchParams {
     return new URLSearchParams({
         action_mode: "device_reboot"
     });
+}
+
+export function SetActiveVPNPayload(client?: AsusVpnClient): URLSearchParams {
+    if (client) {
+        return new URLSearchParams({
+            vpnc_proto: `${client.protocol.toLowerCase()}`,
+            vpnc_pptp_options_x: "auto",
+            vpn_clientx_eas: `${client.unit},`,
+            vpn_client_unit: `${client.unit}`,
+            [`vpn_client${client.unit}_username`]: `${client.username}`,
+            [`vpn_client${client.unit}_password`]: `${client.password}`,
+            action_mode: "apply"
+        })
+    } else {
+        return new URLSearchParams({
+            vpnc_proto: "disable",
+            vpnc_pptp_options_x: "",
+            vpn_clientx_eas: "",
+            vpn_client_unit: "",
+            vpnc_pppoe_username: "",
+            vpnc_pppoe_passwd: "",
+            vpnc_heartbeat_x: "",
+            action_mode: "apply"
+        })
+    }
+
 }

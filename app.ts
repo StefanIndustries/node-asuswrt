@@ -12,6 +12,8 @@ async function main() {
 
     const clients = await asusWrt.discoverClients();
     const router = asusWrt.asusRouter!;
+    const vpnClient = await router.getVpnClients();
+    console.log(vpnClient);
     // const trafficData = await router.getTotalTrafficData();
     // const wanStatus = await router.getWANStatus();
     // const wakeOnLanDevices = await router.getWakeOnLanDevices();
