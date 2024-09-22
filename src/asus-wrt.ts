@@ -6,10 +6,12 @@ import {AsusClient} from "./classes/asus-client";
 import {getCfgClientList} from "./models/responses/get-cfg-clientlist";
 import {AppGetPayloads} from "./models/requests/app-get-payloads";
 import * as https from "node:https";
+import {AsusConnectedDevice, ConnectionMethod} from "./models/asus-connected-device";
 
 export class AsusWrt {
     private readonly ax: AxiosInstance;
     private abortController = new AbortController();
+    private mainClient: AsusClient | undefined = undefined;
     public asusRouter: AsusRouter | undefined = undefined;
     public asusAccessPoints: AsusAccessPoint[] = [];
     public allClients: AsusClient[] = [];
@@ -39,9 +41,9 @@ export class AsusWrt {
     }
 
     public async discoverClients(): Promise<AsusClient[]> {
-        const client = new AsusClient(this.ax, this.options.baseURL, '', this.options.username, this.options.password);
-        await client.authenticate();
-        return await client.appGet<getCfgClientList, AsusClient[]>(AppGetPayloads.CfgClientList, (response) => {
+        this.mainClient = new AsusClient(this.ax, this.options.baseURL, '', this.options.username, this.options.password);
+        await this.mainClient.authenticate();
+        return await this.mainClient.appGet<getCfgClientList, AsusClient[]>(AppGetPayloads.CfgClientList, (response) => {
             response.get_cfg_clientlist.forEach((client) => {
                 const formattedUrl = this.options.baseURL!.includes('https://') ? `https://${client.ip}` : this.options.baseURL!.includes('http://') ? `http://${client.ip}` : client.ip;
                 if (client.config.backhalctrl) {
@@ -57,11 +59,58 @@ export class AsusWrt {
         });
     }
 
+    public async updateConnectedDevices(): Promise<any> {
+        await this.mainClient!.appGet<ClientList, any>(AppGetPayloads.ClientList, (response) => {
+            const allConnectedClients = response.get_clientlist;
+            this.allClients.forEach((client) => {
+                client.connectedDevices = [];
+                const wiredClientList = response.get_wiredclientlist[client.mac];
+                if (wiredClientList) {
+                    wiredClientList.forEach((wiredClient) => {
+                        if (response.get_clientlist[wiredClient]) {
+                            client.connectedDevices.push(this.mapClientToAsusClient(allConnectedClients[wiredClient], 'wired'));
+                        }
+                    });
+                }
+                if (response.get_wclientlist[client.mac]) {
+                    const twoGClientList = response.get_wclientlist[client.mac]['2G'];
+                    if (twoGClientList) {
+                        twoGClientList.forEach((twoGClient) => {
+                            client.connectedDevices.push(this.mapClientToAsusClient(allConnectedClients[twoGClient], '2g'));
+                        });
+                    }
+                    const fiveGClientList = response.get_wclientlist[client.mac]['5G'];
+                    if (fiveGClientList) {
+                        fiveGClientList.forEach((fiveGClient) => {
+                            client.connectedDevices.push(this.mapClientToAsusClient(allConnectedClients[fiveGClient], '5g'));
+                        });
+                    }
+                }
+            });
+        });
+    }
+
     public dispose(): void {
         this.abortController.abort();
         this.asusRouter = undefined;
         this.asusAccessPoints = [];
         this.allClients = [];
+        this.mainClient = undefined;
+    }
+
+    private mapClientToAsusClient(clientEntry: ClientEntry, connectionType: ConnectionMethod) : AsusConnectedDevice {
+        return {
+            connectionMethod: connectionType,
+            dpiDevice: clientEntry.dpiDevice,
+            ip: clientEntry.ip,
+            ipMethod: clientEntry.ipMethod,
+            mac: clientEntry.mac,
+            name: clientEntry.name,
+            nickName: clientEntry.nickName,
+            online: clientEntry.isOnline && clientEntry.isOnline === '1',
+            rssi: clientEntry.rssi !== "" ? parseInt(clientEntry.rssi) : 0,
+            vendor: clientEntry.vendor
+        }
     }
 
     private createRouter = (url: string, mac: string): AsusRouter => new AsusRouter(this.ax, url, mac, this.options.username, this.options.password);

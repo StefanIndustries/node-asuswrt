@@ -9,4 +9,5 @@ export enum AppGetPayloads {
     OoklaServers = 'ookla_speedtest_get_servers()',
     OoklaSpeedtestHistory = 'ookla_speedtest_get_history()',
     OoklaSpeedtestResult = 'ookla_speedtest_get_result()',
+    ClientList = 'get_clientlist();get_wiredclientlist();get_wclientlist();',
 }

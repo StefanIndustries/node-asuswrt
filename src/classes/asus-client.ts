@@ -9,6 +9,7 @@ import {AppGetTransformer} from "../transformers/app-get-transformer";
 import {Uptime} from "../models/responses/uptime";
 import {uptimeTransformer} from "../transformers/uptime-transformer";
 import {RebootNodePayload, SetLedsPayload} from "../models/requests/apply-app-payloads";
+import {AsusConnectedDevice} from "../models/asus-connected-device";
 
 export class AsusClient {
     asusToken: string = '';
@@ -17,6 +18,7 @@ export class AsusClient {
     axios: AxiosInstance;
     username: string = '';
     password: string = '';
+    connectedDevices: AsusConnectedDevice[] = [];
 
     constructor(ax: AxiosInstance, url: string, mac: string, username: string, password: string) {
         this.url = url;
@@ -47,7 +49,7 @@ export class AsusClient {
         return loginResult.data;
     }
 
-    async appGet<T, TT>(payload: AppGetPayloads, appGetTransformer: AppGetTransformer<T, TT>): Promise<TT> {
+    async appGet<T, TT>(payload: AppGetPayloads, appGetTransformer?: AppGetTransformer<T, TT>): Promise<TT> {
         const path = '/appGet.cgi';
         try {
             const response = await this.axios.request({
@@ -62,7 +64,11 @@ export class AsusClient {
                 }
             });
             const result = response.data;
-            return appGetTransformer(<T> result);
+            if (appGetTransformer) {
+                return appGetTransformer(<T> result);
+            } else {
+                return result;
+            }
         } catch (err) {
             throw new Error(`failed to get ${payload}: ${err}`);
         }
@@ -77,16 +83,6 @@ export class AsusClient {
                 'Content-Type': 'application/x-www-form-urlencoded'
             },
             data: payload.toString()
-        });
-        return response.status >= 200 && response.status < 300;
-    }
-
-    async applyAppGET(payload: string): Promise<boolean> {
-        const path = '/applyapp.cgi';
-        const response = await this.axios.request({
-            baseURL: this.url,
-            url: `${path}?${payload}`,
-            method: 'GET',
         });
         return response.status >= 200 && response.status < 300;
     }

@@ -18,14 +18,12 @@ import {OoklaSpeedtestServersTransformer} from "../transformers/ookla-speedtest-
 import {OoklaSpeedtestHistory} from "../models/responses/ookla-speedtest-history";
 import {AsusOoklaSpeedtestResult} from "../models/asus-ookla-speedtest-result";
 import {OoklaSpeedtestHistoryTransformer} from "../transformers/ookla-speedtest-history-transformer";
-import {RebootNetworkPayload, SetActiveVPNPayload} from "../models/requests/apply-app-payloads";
+import {RebootNetworkPayload, SetActiveVPNPayload, WakeOnLanPayload} from "../models/requests/apply-app-payloads";
 
 export class AsusRouter extends AsusClient {
     constructor(ax: AxiosInstance, url: string, mac: string, username: string, password: string) {
         super(ax, url, mac, username, password);
-        super.authenticate().then(() => {
-            console.log('router authenticated');
-        }).catch((e) => {
+        super.authenticate().then(() => {}).catch((e) => {
             throw new Error(e);
         });
     }
@@ -40,6 +38,10 @@ export class AsusRouter extends AsusClient {
 
     async getWakeOnLanDevices(): Promise<AsusWakeOnLanDevice[]> {
         return await this.appGet<Wollist, AsusWakeOnLanDevice[]>(AppGetPayloads.WakeOnLanList, wollistTransformer);
+    }
+
+    async callWakeOnLan(wolDevice: AsusWakeOnLanDevice): Promise<boolean> {
+        return await this.applyAppPOST(WakeOnLanPayload(wolDevice));
     }
 
     async getVpnClients(): Promise<AsusVpnClient[]> {

@@ -1,4 +1,5 @@
 import {AsusVpnClient} from "../asus-vpn-client";
+import {AsusWakeOnLanDevice} from "../asus-wake-on-lan-device";
 
 export function SetLedsPayload(enabled: boolean, mac: string): URLSearchParams {
     return new URLSearchParams({
@@ -18,6 +19,14 @@ export function RebootNodePayload(mac: string): URLSearchParams {
 export function RebootNetworkPayload(): URLSearchParams {
     return new URLSearchParams({
         action_mode: "device_reboot"
+    });
+}
+
+export function WakeOnLanPayload(wolDevice: AsusWakeOnLanDevice): URLSearchParams {
+    return new URLSearchParams({
+        current_page: "Main_WOL_Content.asp",
+        SystemCmd: `ether-wake -i br0 ${wolDevice.mac}`,
+        action_mode: " Refresh "
     });
 }
 
@@ -44,5 +53,4 @@ export function SetActiveVPNPayload(client?: AsusVpnClient): URLSearchParams {
             action_mode: "apply"
         })
     }
-
 }

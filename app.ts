@@ -12,15 +12,18 @@ async function main() {
 
     const clients = await asusWrt.discoverClients();
     const router = asusWrt.asusRouter!;
-    const vpnClient = await router.getVpnClients();
-    console.log(vpnClient);
+    await asusWrt.updateConnectedDevices();
+
+    // let clientsUpdated = asusWrt.allClients;
+    // const vpnClient = await router.getVpnClients();
+    // console.log(vpnClient);
     // const trafficData = await router.getTotalTrafficData();
     // const wanStatus = await router.getWANStatus();
     // const wakeOnLanDevices = await router.getWakeOnLanDevices();
     // const vpnClients = await router.getVpnClients();
-    // // const ooklaServers = await router.getOoklaServers();
-    // // const speedTestResult = await router.runSpeedtest(ooklaServers[0]);
-    // // console.log(speedTestResult);
+    // const ooklaServers = await router.getOoklaServers();
+    // const speedTestResult = await router.runSpeedtest(ooklaServers[0]);
+    // console.log(speedTestResult);
 }
 
 main().then(() => {
