@@ -1,4 +1,4 @@
-export interface AsusWRTVPNClient {
+export interface AsusVpnClient {
     description: string;
     protocol: string;
     unit: string;

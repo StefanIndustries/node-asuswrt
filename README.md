@@ -1,244 +1,109 @@
-# node-asuswrt
-API wrapper/client for Asus WRT routers/access points
+# AsusWrt NPM Package
 
-All async methods return promise based types and can be awaited.
+The `AsusWrt` NPM package is a powerful tool for interfacing with Asus routers, allowing you to manage your router and
+connected devices programmatically. This README provides an example of how to use the package and explains its main
+functionalities.
 
-## Example
+The 2.x release restructured the entire process of data management and optimized usage of the Axios client. Each router or access point is now its own 'instance' with operations instead of one singleton calling all methods.
+
+## Installation
+
+To install the `AsusWrt` package, use the following command:
+
+```bash
+npm install asus-wrt
+```
+
+## Usage
+
+Below is an example of how to use the `AsusWrt` package in a TypeScript project:
+
 ```typescript
-import { AsusWRT } from "node-asuswrt";
+import {AsusWrt} from "./src/asus-wrt";
+import {AsusClient} from "./lib/classes/asus-client";
 
-const config = {
-    Username: 'admin',
-    Password: 'password',
-    BaseUrl: 'http://192.168.1.1',
-    ErrorLogCallback: (logDescription, logData) => { // optional property
-        if (logData) {
-            console.log(logDescription, logData);
-        } else {
-            console.log(logDescription);
-        }
-    },
-    InfoLogCallback: (logDescription, logData) => { // optional property
-        if (logData) {
-            console.log(logDescription, logData);
-        } else {
-            console.log(logDescription);
-        }
-    }
+async function main() {
+    const url = process.env.ASUS_URL!;
+    const username = process.env.ASUS_USERNAME!;
+    const password = process.env.ASUS_PASSWORD!;
+    const asusWrt = new AsusWrt({
+        baseURL: url,
+        username: username,
+        password: password,
+    });
+
+    const clients = await asusWrt.discoverClients();
+    const router = asusWrt.asusRouter!;
+    await asusWrt.updateConnectedDevices();
+
+    asusWrt.allClients.forEach((client: AsusClient) => {
+        console.log(client.setLeds(true));
+        console.log(client.reboot());
+        console.log(client.getCPUMemoryLoad());
+        console.log(client.getUptimeSeconds());
+        console.log(client.connectedDevices);
+    });
+
+    const vpnClient = await router.getVpnClients();
+    const trafficData = await router.getTotalTrafficData();
+    const wanStatus = await router.getWANStatus();
+    const wakeOnLanDevices = await router.getWakeOnLanDevices();
+    const vpnClients = await router.getVpnClients();
+    const ooklaServers = await router.getOoklaServers();
+    const speedTestResult = await router.runSpeedtest(ooklaServers[0]);
 }
 
-const asus = new AsusWRT.AsusWRT(config);
-
-asus.getWANStatus().then(result => {
-    console.log(result);
-});
-
-asus.getTotalTrafficData().then(result => {
-    console.log('traffic', result);
+main().then(() => {
+    console.log('Program done');
 })
-
-asus.getRouters().then(result => {
-    result.forEach(router => {
-        asus.getCPUMemoryLoad(router.mac).then(result => {
-            console.log('load', result);
-        });
-        asus.getUptime(router.mac).then(result => {
-            console.log('uptime', result);
-        });
-        asus.setLedsEnabled(router.mac, true).then(success => {
-            console.log(success);
-        });
-        asus.getWirelessClients(router.mac, "2G").then(wiredClients => {
-            console.log(router.alias, wiredClients);
-        });
-    })
-});
 ```
 
-## Methods
+### Environment Variables
 
-### Import the wrapper
-```typescript
-import { AsusWRT } from "node-asuswrt";
-```
+Make sure to set the following environment variables with the correct values for connecting to your Asus router with the example code.
 
-### Create a new instance of the wrapper
-```typescript
-const config = {
-    Username: 'admin',
-    Password: 'password',
-    BaseUrl: 'http://192.168.1.1',
-    ErrorLogCallback: (logDescription, logData) => { // optional
-        if (logData) {
-            console.log(logDescription, logData);
-        } else {
-            console.log(logDescription);
-        }
-    },
-    InfoLogCallback: (logDescription, logData) => { // optional
-        if (logData) {
-            console.log(logDescription, logData);
-        } else {
-            console.log(logDescription);
-        }
-    }
-}
+- `ASUS_URL`: Base URL of the Asus router.
+- `ASUS_USERNAME`: Username for logging into the router.
+- `ASUS_PASSWORD`: Password for logging into the router.
 
-const asus = new AsusWRT.AsusWRT(config);
-```
+### Example Code Explanation
 
-### Get all routers in the network (async)
-```typescript
-asus.getRouters()
-```
+1. **Initialization:**
+    - Create an instance of `AsusWrt` with the necessary credentials by providing `baseURL`, `username`, and `password`.
 
-### Get wireless clients connected to router (async)
-```typescript
-asus.getWirelessClients(router.mac, "2G") // 2.4ghz devices
-asus.getWirelessClients(router.mac, "5G") // 5ghz devices
-```
+2. **Discovering Clients:**
+    - Use `discoverClients` to get a list of connected clients.
+    - Update connected devices with `updateConnectedDevices`.
 
-### Get wired clients connected to router (async)
-```typescript
-asus.getWiredClients(router.mac)
-```
+3. **Accessing Router and Client Specific Functions:**
+    - Access client-specific functions such as `setLeds`, `reboot`, `getCPUMemoryLoad`, `getUptimeSeconds`, and
+      `connectedDevices` for each client.
+    - Get additional data from the router like VPN clients, total traffic data, WAN status, and Wake-on-LAN devices.
 
-### Set LED value for router (async)
-```typescript
-asus.setLedsEnabled(router.mac, true) // turns leds on
-asus.setLedsEnabled(router.mac, false) // turns leds off
-```
+4. **Speed Test:**
+    - Retrieve Ookla speed test servers and run a speed test using `runSpeedtest`.
 
-### Reboot network (all access points) (async)
-```typescript
-asus.rebootNetwork()
-```
+### Functions
 
-### Reboot router (async)
-```typescript
-asus.rebootDevice(router.mac);
-```
+#### `AsusWrt` Methods
 
-### Get CPU and Memory Load (async)
-```typescript
-asus.getCPUMemoryLoad(router.mac) // requires mac of router / access point
-```
+- `discoverClients()`: Discovers connected clients on the network.
+- `updateConnectedDevices()`: Updates the list of connected devices.
 
-### Get uptime in seconds (async)
-```typescript
-asus.getUptime(router.mac) // requires mac of router / access point
-```
+#### `AsusClient` Methods
+These methods are also available on the AsusRouter
 
-### Get total traffic data (async)
-```typescript
-asus.getTotalTrafficData()
-// poll this function to get realtime data usage for example 2 seconds interval and calculate difference
-```
+- `setLeds(state: boolean)`: Sets the LED state.
+- `reboot()`: Reboots the client.
+- `getCPUMemoryLoad()`: Retrieves CPU and memory load.
+- `getUptimeSeconds()`: Retrieves uptime in seconds.
+- `connectedDevices`: Lists connected devices.
 
-### Get WAN Status (async)
-```typescript
-asus.getWANStatus()
-```
+#### `AsusRouter` Methods
 
-### Get Wake On Lan Devices (async)
-```typescript
-asus.getWakeOnLanList()
-```
-
-### Run Wake On Lan command (async)
-```typescript
-asus.wakeOnLan(wakeOnLanDeviceMac)
-```
-
-### Run export certificate (async)
-```typescript
-// `npm install fs.promises` for writeFile
-asus.exportCertificate().then(result => {
-    writeFile('./cert_key.tar', result);
-});
-```
-
-## Objects
-### AsusWRTConnectedDevice
-```typescript
-{
-    ip: string,
-    mac: string,
-    name: string,
-    nickName: string,
-    dpiDevice: string,
-    vendor: string,
-    ipMethod: string,
-    rssi: number
-}
-```
-
-### AsusWRTLoad
-```typescript
-{
-    CPUUsagePercentage: number,
-    MemoryUsagePercentage: number
-}
-```
-
-### AsusWRTOperationMode
-```typescript
-{
-    Router: 0,
-    AccessPoint: 1
-}
-```
-
-### AsusWRTRouter
-```typescript
-{
-    alias: string,
-    modelName: string,
-    uiModelName: string,
-    productId: string,
-    firmwareVersion: string,
-    newFirmwareVersion: string,
-    ip: string,
-    mac: string,
-    online: boolean,
-    operationMode: AsusWRTOperationMode
-}
-```
-
-### AsusWRTTrafficData
-```typescript
-{
-    trafficReceived: number;
-    trafficSent: number;
-}
-```
-
-### AsusWRTWANStatus
-```typescript
-{
-    status?: number;
-    statusstr?: string;
-    type?: string;
-    ipaddr?: string;
-    netmask?: string;
-    gateway?: string;
-    dns?: string;
-    lease?: number;
-    expires?: number;
-    xtype?: string;
-    xipaddr?: string;
-    xnetmask?: string;
-    xgateway?: string;
-    xdns?: string;
-    xlease?: number;
-    xexpires?: number;
-}
-```
-
-### AsusWRTWakeOnLanDevice
-```typescript
-{
-    name: string,
-    mac: string
-}
-```
+- `getVpnClients()`: Retrieves VPN clients.
+- `getTotalTrafficData()`: Gets total traffic data.
+- `getWANStatus()`: Gets the WAN status.
+- `getWakeOnLanDevices()`: Retrieves devices that can be woken up using Wake-on-LAN.
+- `getOoklaServers()`: Gets Ookla speed test servers.
+- `runSpeedtest(server)`: Runs a speed test using the specified Ookla server.

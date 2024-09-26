@@ -1,4 +1,4 @@
-export interface AsusWRTOoklaServer {
+export interface AsusOoklaServer {
     id: number,
     host: string,
     port: number,

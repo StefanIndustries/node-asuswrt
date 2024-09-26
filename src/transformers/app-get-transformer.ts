@@ -1,0 +1,1 @@
+export type AppGetTransformer<T, TT> = (data: T) => TT

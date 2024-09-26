@@ -1,12 +1,14 @@
 {
   "name": "node-asuswrt",
-  "version": "1.1.1",
+  "version": "2.0.1",
   "author": "Stefan Simon",
-  "main": "lib/AsusWRT.js",
-  "types": "lib/AsusWRT.d.ts",
+  "main": "lib/asus-wrt.js",
+  "types": "lib/asus-wrt.d.ts",
   "scripts": {
     "build": "tsc",
-    "lint": "eslint . --ext .ts"
+    "lint": "npx eslint ./src",
+    "lint-fix": "npx eslint ./src --fix",
+    "start": "tsx watch --env-file=.env ./app.ts"
   },
   "repository": {
     "type": "git",
@@ -18,16 +20,16 @@
   },
   "homepage": "https://github.com/StefanIndustries/node-asuswrt",
   "dependencies": {
-    "axios": "^1.7.4"
+    "axios": "^1.7.7"
   },
   "files": [
     "lib/**/*"
   ],
   "devDependencies": {
-    "@types/node": "18.15.3",
-    "@typescript-eslint/eslint-plugin": "6.2.1",
-    "@typescript-eslint/parser": "6.2.1",
-    "eslint": "8.46.0",
-    "typescript": "5.1.6"
+    "tsx": "^4.19.1",
+    "@types/node": "^22.5.5",
+    "eslint": "^9.11.0",
+    "typescript-eslint": "^8.6.0",
+    "typescript": "^5.6.2"
   }
 }
