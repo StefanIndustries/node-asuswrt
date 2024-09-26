@@ -19,10 +19,11 @@ import { OoklaSpeedtestHistory } from "../models/responses/ookla-speedtest-histo
 import { AsusOoklaSpeedtestResult } from "../models/asus-ookla-speedtest-result";
 import { OoklaSpeedtestHistoryTransformer } from "../transformers/ookla-speedtest-history-transformer";
 import { RebootNetworkPayload, SetActiveVPNPayload, WakeOnLanPayload } from "../models/requests/apply-app-payloads";
+import { Device } from "../models/responses/get-cfg-clientlist";
 
 export class AsusRouter extends AsusClient {
-    constructor(ax: AxiosInstance, url: string, mac: string, username: string, password: string) {
-        super(ax, url, mac, username, password);
+    constructor(ax: AxiosInstance, url: string, mac: string, username: string, password: string, deviceInfo: Device) {
+        super(ax, url, mac, username, password, deviceInfo);
         super.authenticate().then(() => {
         }).catch((e) => {
             throw new Error(e);

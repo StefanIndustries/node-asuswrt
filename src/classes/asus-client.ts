@@ -10,22 +10,29 @@ import { Uptime } from "../models/responses/uptime";
 import { uptimeTransformer } from "../transformers/uptime-transformer";
 import { RebootNodePayload, SetLedsPayload } from "../models/requests/apply-app-payloads";
 import { AsusConnectedDevice } from "../models/asus-connected-device";
+import { Device } from "../models/responses/get-cfg-clientlist";
 
 export class AsusClient {
-    asusToken: string = '';
-    url: string = '';
-    mac: string = '';
-    axios: AxiosInstance;
-    username: string = '';
-    password: string = '';
-    connectedDevices: AsusConnectedDevice[] = [];
+    public asusToken: string = '';
+    public url: string = '';
+    public mac: string = '';
+    private axios: AxiosInstance;
+    private username: string = '';
+    private password: string = '';
+    public connectedDevices: AsusConnectedDevice[] = [];
+    public deviceInfo: Device;
 
-    constructor(ax: AxiosInstance, url: string, mac: string, username: string, password: string) {
+    constructor(ax: AxiosInstance, url: string, mac: string, username: string, password: string, deviceInfo?: Device) {
         this.url = url;
         this.mac = mac;
         this.axios = ax;
         this.username = username;
         this.password = password;
+        if (deviceInfo) {
+            this.deviceInfo = deviceInfo;
+        } else {
+            this.deviceInfo = {} as Device;
+        }
     }
 
     async authenticate(): Promise<LoginResult> {

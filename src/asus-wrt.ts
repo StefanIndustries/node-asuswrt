@@ -3,7 +3,7 @@ import { AsusOptions } from "./asus-options";
 import { AsusRouter } from "./classes/asus-router";
 import { AsusAccessPoint } from "./classes/asus-access-point";
 import { AsusClient } from "./classes/asus-client";
-import { getCfgClientList } from "./models/responses/get-cfg-clientlist";
+import { Device, getCfgClientList } from "./models/responses/get-cfg-clientlist";
 import { AppGetPayloads } from "./models/requests/app-get-payloads";
 import * as https from "node:https";
 import { AsusConnectedDevice, ConnectionMethod } from "./models/asus-connected-device";
@@ -52,11 +52,11 @@ export class AsusWrt {
             response.get_cfg_clientlist.forEach((client) => {
                 const formattedUrl = this.options.baseURL!.includes('https://') ? `https://${client.ip}` : this.options.baseURL!.includes('http://') ? `http://${client.ip}` : client.ip;
                 if (client.config.backhalctrl) {
-                    const accessPoint = this.createAccessPoint(formattedUrl, client.mac);
+                    const accessPoint = this.createAccessPoint(formattedUrl, client);
                     this.asusAccessPoints.push(accessPoint);
                     this.allClients.push(accessPoint);
                 } else {
-                    this.asusRouter = this.createRouter(formattedUrl, client.mac);
+                    this.asusRouter = this.createRouter(formattedUrl, client);
                     this.allClients.push(this.asusRouter);
                 }
             });
@@ -130,7 +130,7 @@ export class AsusWrt {
         }
     }
 
-    private createRouter = (url: string, mac: string): AsusRouter => new AsusRouter(this.ax, url, mac, this.options.username, this.options.password);
+    private createRouter = (url: string, deviceInfo: Device): AsusRouter => new AsusRouter(this.ax, url, deviceInfo.mac, this.options.username, this.options.password, deviceInfo);
 
-    private createAccessPoint = (url: string, mac: string): AsusAccessPoint => new AsusAccessPoint(this.ax, url, mac, this.options.username, this.options.password);
+    private createAccessPoint = (url: string, deviceInfo: Device): AsusAccessPoint => new AsusAccessPoint(this.ax, url, deviceInfo.mac, this.options.username, this.options.password, deviceInfo);
 }

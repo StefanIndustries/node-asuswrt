@@ -49,7 +49,7 @@ interface WiredPort {
     }
 }
 
-interface Device {
+export interface Device {
     alias: string;
     model_name: string;
     ui_model_name: string;
