@@ -48,6 +48,8 @@ export class AsusWrt {
     public async discoverClients(): Promise<AsusClient[]> {
         this.mainClient = new AsusClient(this.ax, this.options.baseURL, '', this.options.username, this.options.password);
         await this.mainClient.authenticate();
+        this.allClients = [];
+        this.asusRouter = undefined;
         return await this.mainClient.appGet<getCfgClientList, AsusClient[]>(AppGetPayloads.CfgClientList, (response) => {
             response.get_cfg_clientlist.forEach((client) => {
                 const formattedUrl = this.options.baseURL!.includes('https://') ? `https://${client.ip}` : this.options.baseURL!.includes('http://') ? `http://${client.ip}` : client.ip;
