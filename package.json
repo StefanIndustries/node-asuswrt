@@ -1,6 +1,6 @@
 {
   "name": "node-asuswrt",
-  "version": "2.0.3",
+  "version": "2.0.4",
   "author": "Stefan Simon",
   "main": "lib/asus-wrt.js",
   "types": "lib/asus-wrt.d.ts",
@@ -27,9 +27,9 @@
   ],
   "devDependencies": {
     "tsx": "^4.19.1",
-    "@types/node": "^22.5.5",
-    "eslint": "^9.11.0",
-    "typescript-eslint": "^8.6.0",
+    "@types/node": "^22.7.4",
+    "eslint": "^9.11.1",
+    "typescript-eslint": "^8.7.0",
     "typescript": "^5.6.2"
   }
 }
