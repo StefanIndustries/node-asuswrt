@@ -52,7 +52,14 @@ export class AsusWrt {
         this.asusRouter = undefined;
         return await this.mainClient.appGet<getCfgClientList, AsusClient[]>(AppGetPayloads.CfgClientList, (response) => {
             response.get_cfg_clientlist.forEach((client) => {
-                const formattedUrl = this.options.baseURL!.includes('https://') ? `https://${client.ip}` : this.options.baseURL!.includes('http://') ? `http://${client.ip}` : client.ip;
+                let formattedUrl = this.options.baseURL!.includes('https://') ? `https://${client.ip}` : this.options.baseURL!.includes('http://') ? `http://${client.ip}` : client.ip;
+
+                const urlObj = new URL(this.options.baseURL!);
+                const portNumber = urlObj.port;
+                if (portNumber) {
+                    formattedUrl += `:${portNumber}`;
+                }
+                
                 if (client.config.backhalctrl) {
                     const accessPoint = this.createAccessPoint(formattedUrl, client);
                     this.asusAccessPoints.push(accessPoint);
