@@ -88,7 +88,7 @@ export class AsusWrt {
                 const wiredClientList = response.get_wiredclientlist[client.mac];
                 if (wiredClientList) {
                     wiredClientList.forEach((wiredClient) => {
-                        if (response.get_clientlist[wiredClient]) {
+                        if (response.get_clientlist[wiredClient] && this.validateAsusClient(response.get_clientlist[wiredClient])) {
                             client.connectedDevices.push(this.mapClientToAsusClient(allConnectedClients[wiredClient], 'wired'));
                         }
                     });
@@ -97,13 +97,17 @@ export class AsusWrt {
                     const twoGClientList = response.get_wclientlist[client.mac]['2G'];
                     if (twoGClientList) {
                         twoGClientList.forEach((twoGClient) => {
-                            client.connectedDevices.push(this.mapClientToAsusClient(allConnectedClients[twoGClient], '2g'));
+                            if (this.validateAsusClient(allConnectedClients[twoGClient])) {
+                                client.connectedDevices.push(this.mapClientToAsusClient(allConnectedClients[twoGClient], '2g'));
+                            }
                         });
                     }
                     const fiveGClientList = response.get_wclientlist[client.mac]['5G'];
                     if (fiveGClientList) {
                         fiveGClientList.forEach((fiveGClient) => {
-                            client.connectedDevices.push(this.mapClientToAsusClient(allConnectedClients[fiveGClient], '5g'));
+                            if (this.validateAsusClient(allConnectedClients[fiveGClient])) {
+                                client.connectedDevices.push(this.mapClientToAsusClient(allConnectedClients[fiveGClient], '5g'));
+                            }
                         });
                     }
                 }
@@ -137,6 +141,19 @@ export class AsusWrt {
             rssi: clientEntry.rssi !== "" ? parseInt(clientEntry.rssi) : 0,
             vendor: clientEntry.vendor
         }
+    }
+    
+    private validateAsusClient(clientEntry: ClientEntry): boolean {
+        return clientEntry &&
+            clientEntry.hasOwnProperty('dpiDevice') &&
+            clientEntry.hasOwnProperty('ip') &&
+            clientEntry.hasOwnProperty('ipMethod') &&
+            clientEntry.hasOwnProperty('mac') &&
+            clientEntry.hasOwnProperty('name') &&
+            clientEntry.hasOwnProperty('nickName') &&
+            clientEntry.hasOwnProperty('isOnline') &&
+            clientEntry.hasOwnProperty('rssi') &&
+            clientEntry.hasOwnProperty('vendor');
     }
 
     private createRouter = (url: string, deviceInfo: Device): AsusRouter => new AsusRouter(this.ax, url, deviceInfo.mac, this.options.username, this.options.password, deviceInfo);
