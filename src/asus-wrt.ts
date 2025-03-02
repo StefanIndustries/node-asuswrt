@@ -7,6 +7,7 @@ import { Device, getCfgClientList } from "./models/responses/get-cfg-clientlist"
 import { AppGetPayloads } from "./models/requests/app-get-payloads";
 import * as https from "node:https";
 import { AsusConnectedDevice, ConnectionMethod } from "./models/asus-connected-device";
+import {userAgent} from "./constants";
 
 export class AsusWrt {
     public asusRouter: AsusRouter | undefined = undefined;
@@ -21,7 +22,7 @@ export class AsusWrt {
             baseURL: options.baseURL,
             signal: this.abortController.signal,
             headers: {
-                'User-Agent': 'asusrouter-Android-DUTUtil-1.0.0.3.58-163'
+                'User-Agent': userAgent
             },
             httpsAgent: new https.Agent({
                 rejectUnauthorized: !options.isSelfSignedCertificate,

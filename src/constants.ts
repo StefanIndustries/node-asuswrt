@@ -1,0 +1,1 @@
+export const userAgent: string = 'asusrouter-Android-DUTUtil-1.0.0.3.58-163';
