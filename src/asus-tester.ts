@@ -100,7 +100,7 @@ export class AsusTester {
             throw new Error("Cannot test connection after the tester has been disposed.")
         }
         try {
-            const response = await this.ax.get("/login.cgi");
+            const response = await this.ax!.get("/login.cgi");
             return response.status === 200;
         } catch {
             return false;
@@ -118,7 +118,7 @@ export class AsusTester {
         try {
             const path = '/login.cgi';
             const formattedUsernamePassword = Buffer.from(`${this.options.username}:${this.options.password}`).toString('base64');
-            const response = <AxiosResponse<LoginResult>>await this.ax.request({
+            const response = <AxiosResponse<LoginResult>>await this.ax!.request({
                 method: 'POST',
                 baseURL: this.options.baseURL,
                 url: path,
