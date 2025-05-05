@@ -1,6 +1,6 @@
 {
   "name": "node-asuswrt",
-  "version": "2.1.1",
+  "version": "2.1.2",
   "author": "Stefan Simon",
   "main": "lib/asus-wrt.js",
   "types": "lib/asus-wrt.d.ts",
@@ -20,16 +20,16 @@
   },
   "homepage": "https://github.com/StefanIndustries/node-asuswrt",
   "dependencies": {
-    "axios": "^1.8.1"
+    "axios": "^1.9.0"
   },
   "files": [
     "lib/**/*"
   ],
   "devDependencies": {
-    "tsx": "^4.19.3",
-    "@types/node": "^22.13.8",
-    "eslint": "^9.21.0",
-    "typescript-eslint": "^8.25.0",
-    "typescript": "^5.7.3"
+    "tsx": "^4.19.4",
+    "@types/node": "^22.15.3",
+    "eslint": "^9.26.0",
+    "typescript-eslint": "^8.31.1",
+    "typescript": "^5.8.3"
   }
 }
