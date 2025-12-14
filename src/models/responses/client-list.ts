@@ -53,6 +53,8 @@ interface GetWClientList {
     [macAddress: string]: {
         '2G': string[];
         '5G'?: string[];
+        '6G'?: string[];
+        '7G'?: string[];
     };
 }
 

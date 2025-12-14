@@ -111,6 +111,22 @@ export class AsusWrt {
                             }
                         });
                     }
+                    const sixGClientList = response.get_wclientlist[client.mac]['6G'];
+                    if (sixGClientList) {
+                        sixGClientList.forEach((sixGClient) => {
+                            if (this.validateAsusClient(allConnectedClients[sixGClient])) {
+                                client.connectedDevices.push(this.mapClientToAsusClient(allConnectedClients[sixGClient], '6g'));
+                            }
+                        });
+                    }
+                    const sevenGClientList = response.get_wclientlist[client.mac]['7G'];
+                    if (sevenGClientList) {
+                        sevenGClientList.forEach((sevenGClient) => {
+                            if (this.validateAsusClient(allConnectedClients[sevenGClient])) {
+                                client.connectedDevices.push(this.mapClientToAsusClient(allConnectedClients[sevenGClient], '7g'));
+                            }
+                        });
+                    }
                 }
             });
         });

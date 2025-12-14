@@ -11,4 +11,4 @@ export interface AsusConnectedDevice {
     connectionMethod: ConnectionMethod
 }
 
-export type ConnectionMethod = 'wired' | '2g' | '5g';
+export type ConnectionMethod = 'wired' | '2g' | '5g' | '6g' | '7g';
