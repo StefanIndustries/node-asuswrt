@@ -86,48 +86,44 @@ export class AsusWrt {
             const allConnectedClients = response.get_clientlist;
             this.allClients.forEach((client) => {
                 client.connectedDevices = [];
-                const wiredClientList = response.get_wiredclientlist[client.mac];
-                if (wiredClientList) {
-                    wiredClientList.forEach((wiredClient) => {
-                        if (response.get_clientlist[wiredClient] && this.validateAsusClient(response.get_clientlist[wiredClient])) {
-                            client.connectedDevices.push(this.mapClientToAsusClient(allConnectedClients[wiredClient], 'wired'));
-                        }
-                    });
-                }
-                if (response.get_wclientlist[client.mac]) {
-                    const twoGClientList = response.get_wclientlist[client.mac]['2G'];
-                    if (twoGClientList) {
-                        twoGClientList.forEach((twoGClient) => {
-                            if (this.validateAsusClient(allConnectedClients[twoGClient])) {
-                                client.connectedDevices.push(this.mapClientToAsusClient(allConnectedClients[twoGClient], '2g'));
-                            }
-                        });
+                Object.keys(allConnectedClients).forEach((macAddress) => {
+                    if (macAddress === 'macList') {
+                        return;
                     }
-                    const fiveGClientList = response.get_wclientlist[client.mac]['5G'];
-                    if (fiveGClientList) {
-                        fiveGClientList.forEach((fiveGClient) => {
-                            if (this.validateAsusClient(allConnectedClients[fiveGClient])) {
-                                client.connectedDevices.push(this.mapClientToAsusClient(allConnectedClients[fiveGClient], '5g'));
-                            }
-                        });
+
+                    const clientEntry = allConnectedClients[macAddress];
+
+                    if(!this.validateAsusClient(clientEntry)) {
+                        return;
                     }
-                    const sixGClientList = response.get_wclientlist[client.mac]['6G'];
-                    if (sixGClientList) {
-                        sixGClientList.forEach((sixGClient) => {
-                            if (this.validateAsusClient(allConnectedClients[sixGClient])) {
-                                client.connectedDevices.push(this.mapClientToAsusClient(allConnectedClients[sixGClient], '6g'));
-                            }
-                        });
+
+                    if (clientEntry.isOnline === '0') {
+                        return;
                     }
-                    const sevenGClientList = response.get_wclientlist[client.mac]['7G'];
-                    if (sevenGClientList) {
-                        sevenGClientList.forEach((sevenGClient) => {
-                            if (this.validateAsusClient(allConnectedClients[sevenGClient])) {
-                                client.connectedDevices.push(this.mapClientToAsusClient(allConnectedClients[sevenGClient], '7g'));
-                            }
-                        });
+
+                    if (clientEntry.isASUS === '1') {
+                        return;
                     }
-                }
+
+                    if(clientEntry.amesh_papMac !== client.mac) {
+                        return;
+                    }
+                    
+                    let connectionType: ConnectionMethod = 'wired';
+                    switch (parseInt(clientEntry.isWL)) {
+                        case 0: connectionType = 'wired'; break;
+                        case 1: connectionType = '2g'; break;
+                        case 2: connectionType = '5g'; break;
+                        case 3:
+                        case 4:
+                        case 5:
+                        case 6:
+                        case 7:
+                            connectionType = '6g'; break;
+                        default: connectionType = 'wired';
+                    }
+                    client.connectedDevices.push(this.mapClientToAsusClient(clientEntry, connectionType));
+                });
             });
         });
     }

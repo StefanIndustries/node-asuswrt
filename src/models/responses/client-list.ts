@@ -8,6 +8,7 @@ interface ClientEntry {
     from: string;
     macRepeat: string;
     isGateway: string;
+    isASUS: string;
     isWebServer: string;
     isPrinter: string;
     isITunes: string;

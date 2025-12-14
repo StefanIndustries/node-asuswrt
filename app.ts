@@ -10,6 +10,7 @@ async function main() {
         baseURL: url,
         username: username,
         password: password,
+        isSelfSignedCertificate: true,
     }
 
     const asusTester = new AsusTester(options);
@@ -30,7 +31,8 @@ async function main() {
         // console.log(client.reboot());
         // console.log(client.getCPUMemoryLoad());
         // console.log(client.getUptimeSeconds());
-        // console.log(client.connectedDevices);
+        console.log(client.mac);
+        console.log(client.connectedDevices);
     });
 
     // const vpnClient = await router.getVpnClients();
