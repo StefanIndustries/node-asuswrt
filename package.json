@@ -6,6 +6,7 @@
   "types": "lib/asus-wrt.d.ts",
   "scripts": {
     "build": "tsc",
+    "test": "npm run build && node --test test/*.test.cjs",
     "lint": "npx eslint ./src",
     "lint-fix": "npx eslint ./src --fix",
     "start": "tsx watch --env-file=.env ./app.ts"

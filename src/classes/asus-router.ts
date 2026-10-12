@@ -1,4 +1,4 @@
-import { AxiosInstance } from "axios";
+import { AxiosInstance, isAxiosError, isCancel } from "axios";
 import { AsusClient } from "./asus-client";
 import { AppGetPayloads } from "../models/requests/app-get-payloads";
 import { NetdevData } from "../models/responses/netdev-data";
@@ -20,14 +20,159 @@ import { AsusOoklaSpeedtestResult } from "../models/asus-ookla-speedtest-result"
 import { OoklaSpeedtestHistoryTransformer } from "../transformers/ookla-speedtest-history-transformer";
 import { RebootNetworkPayload, SetActiveVPNPayload, WakeOnLanPayload } from "../models/requests/apply-app-payloads";
 import { Device } from "../models/responses/get-cfg-clientlist";
+import { AsusGuestNetwork } from "../models/asus-guest-network";
+import {
+    GuestNetworkMetadataPayload, GuestNetworksPayload, GuestNetworkStatePayload, SetGuestNetworkPayload
+} from "../models/requests/guest-network-payloads";
+import {
+    guestNetworkRadioCount, guestNetworksTransformer, guestNetworkStateTransformer
+} from "../transformers/guest-networks-transformer";
+
+const GUEST_READ_TIMEOUT_MS = 10000;
+const GUEST_APPLY_TIMEOUT_MS = 15000;
+const GUEST_VERIFICATION_TIMEOUT_MS = 60000;
+const GUEST_POLL_INTERVAL_MS = 2000;
+// Stock 388 firmware reports countdowns in 30-second steps; allow two steps during apply.
+const GUEST_COUNTDOWN_TOLERANCE_SECONDS = 60;
 
 export class AsusRouter extends AsusClient {
+    private guestNetworkChange: Promise<void> = Promise.resolve();
+
     constructor(ax: AxiosInstance, url: string, mac: string, username: string, password: string, deviceInfo: Device) {
         super(ax, url, mac, username, password, deviceInfo);
         super.authenticate().then(() => {
         }).catch((e) => {
             throw new Error(e);
         });
+    }
+
+    /** Lists previously configured classic 2.4/5 GHz guest networks, including disabled ones. */
+    async getGuestNetworks(): Promise<AsusGuestNetwork[]> {
+        const metadata = await this.appGet<Record<string, unknown>, Record<string, unknown>>(
+            GuestNetworkMetadataPayload, undefined, GUEST_READ_TIMEOUT_MS
+        );
+        const radioCount = guestNetworkRadioCount(metadata);
+        return await this.appGet<Record<string, unknown>, AsusGuestNetwork[]>(
+            GuestNetworksPayload(radioCount), data => guestNetworksTransformer(data, radioCount),
+            GUEST_READ_TIMEOUT_MS
+        );
+    }
+
+    /**
+     * Enables/disables an existing guest network. Zero seconds means unlimited.
+     * Enabling restarts the router's native countdown, including on an already
+     * enabled network. Resolves only after the configuration/countdown is read back.
+     */
+    async setGuestNetworkEnabled(id: string, enabled: boolean, durationSeconds = 0): Promise<boolean> {
+        const payload = SetGuestNetworkPayload(id, enabled, durationSeconds);
+        // Radio/slot selectors are shared router state. Serialize changes until
+        // the restart has initialized the selected guest network's countdown.
+        const operation = this.guestNetworkChange.then(async () => {
+            const networks = await this.getGuestNetworks();
+            const previous = networks.find(network => network.id === id);
+            if (!previous) {
+                throw new Error('Selected guest network no longer exists or is not configured');
+            }
+            const previousReadAt = Date.now();
+            const response = await this.customAxRequest({
+                baseURL: this.url,
+                url: '/applyapp.cgi',
+                method: 'POST',
+                timeout: GUEST_APPLY_TIMEOUT_MS,
+                headers: {
+                    'Content-Type': 'application/x-www-form-urlencoded',
+                    'Cookie': `asus_token=${this.asusToken}`
+                },
+                data: payload.toString()
+            });
+            if (response.status < 200 || response.status >= 300
+                || !response.data || typeof response.data !== 'object' || Array.isArray(response.data)
+                || response.data.error_status) {
+                throw new Error('Router rejected the guest network change');
+            }
+            await this.verifyGuestNetworkChange(previous, enabled, durationSeconds, previousReadAt);
+            return true;
+        });
+        this.guestNetworkChange = operation.then(() => undefined, () => undefined);
+        return await operation;
+    }
+
+    private async readGuestNetworkState(id: string, timeout: number) {
+        // Keep the raw Axios error so verification can distinguish cancellation,
+        // temporary transport failures, and permanent protocol/validation errors.
+        const response = await this.customAxRequest({
+            baseURL: this.url,
+            url: '/appGet.cgi',
+            method: 'POST',
+            timeout,
+            headers: { 'Cookie': `asus_token=${this.asusToken}` },
+            data: new URLSearchParams({ hook: GuestNetworkStatePayload(id) })
+        });
+        const data = response.data;
+        const state = guestNetworkStateTransformer(data, id);
+        if (typeof data.wl_unit !== 'string' || typeof data.wl_subunit !== 'string') {
+            throw new Error('Router did not return guest network restart selectors');
+        }
+        return {
+            ...state,
+            restartPending: `wl${data.wl_unit}.${data.wl_subunit}` === id,
+            restartComplete: data.wl_unit === '-1' && data.wl_subunit === '-1'
+        };
+    }
+
+    private async verifyGuestNetworkChange(
+        previous: AsusGuestNetwork, enabled: boolean, durationSeconds: number, previousReadAt: number
+    ): Promise<void> {
+        const deadline = Date.now() + GUEST_VERIFICATION_TIMEOUT_MS;
+        let restartObserved = false;
+        let lastReadError: unknown;
+        while (Date.now() < deadline) {
+            const timeout = Math.min(GUEST_READ_TIMEOUT_MS, deadline - Date.now());
+            if (timeout <= 0) {
+                break;
+            }
+            try {
+                const state = await this.readGuestNetworkState(previous.id, timeout);
+                restartObserved ||= state.restartPending;
+                if (state.restartComplete && state.enabled === enabled) {
+                    if (!enabled) {
+                        return;
+                    }
+                    const remaining = state.remainingSeconds;
+                    const countdownMatches = durationSeconds === 0 ? remaining === 0
+                        : remaining !== null && remaining > 0 && remaining <= durationSeconds
+                            && remaining >= Math.max(1, durationSeconds - GUEST_COUNTDOWN_TOLERANCE_SECONDS);
+                    // An idle selector and matching settings can both be stale.
+                    // Require a completed restart or evidence that the timer changed.
+                    const countdownRefreshed = restartObserved || !previous.enabled
+                        || (remaining !== null && previous.remainingSeconds !== null
+                            && (remaining > previous.remainingSeconds
+                                || (durationSeconds === 0 && previous.remainingSeconds > 0)
+                                || previous.remainingSeconds > durationSeconds
+                                    + (Date.now() - previousReadAt) / 1000
+                                    + GUEST_COUNTDOWN_TOLERANCE_SECONDS));
+                    if (state.durationSeconds === durationSeconds && countdownMatches && countdownRefreshed) {
+                        return;
+                    }
+                }
+            } catch (error) {
+                if (isCancel(error) || !isAxiosError(error)
+                    || (error.response
+                        ? ![408, 429, 500, 502, 503, 504].includes(error.response.status)
+                        : !['ECONNABORTED', 'ETIMEDOUT', 'ECONNRESET', 'ECONNREFUSED',
+                            'EHOSTUNREACH', 'ENETUNREACH', 'EAI_AGAIN', 'ENOTFOUND', 'ERR_NETWORK']
+                            .includes(error.code ?? ''))) {
+                    throw error;
+                }
+                lastReadError = error;
+            }
+            const delay = Math.min(GUEST_POLL_INTERVAL_MS, deadline - Date.now());
+            if (delay > 0) {
+                await new Promise(resolve => setTimeout(resolve, delay));
+            }
+        }
+        const detail = lastReadError instanceof Error ? `; last read error: ${lastReadError.message}` : '';
+        throw new Error(`Could not confirm guest network state and countdown; check the ASUS interface${detail}`);
     }
 
     /**
