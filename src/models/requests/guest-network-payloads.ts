@@ -4,7 +4,7 @@ export const GuestNetworkMetadataPayload = 'nvram_get(wl_ifnames);nvram_get(sdn_
 
 export function GuestNetworkStatePayload(id: string): string {
     validateGuestNetworkId(id);
-    return ['wl_unit', 'wl_subunit', `${id}_bss_enabled`, `${id}_expire`, `${id}_expire_tmp`]
+    return ['rc_service', 'wl_unit', 'wl_subunit', `${id}_bss_enabled`, `${id}_expire`, `${id}_expire_tmp`]
         .map(key => `nvram_get(${key});`).join('');
 }
 

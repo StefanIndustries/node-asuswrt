@@ -4,6 +4,18 @@ Run `npm test` to build the library and run the mocked router protocol tests.
 Pull requests and releases run these tests in CI. Test cases cover payloads,
 cross-radio serialization through enable/disable restarts, stale countdowns,
 transient failures, cancellation, malformed readback, and verification deadlines.
+The mock preserves countdown selectors for disabled interfaces and models service
+completion independently via `rc_service`. Regression cases also cover accepted
+applies with lost responses and reconciliation before writing after a failed verification.
+
+## Firmware completion signal
+
+Classic firmware clears `rc_service` after processing the requested services:
+[service handler](https://github.com/RMerl/asuswrt-merlin.ng/blob/f94f6ff8ad96f7366847103e13e69bbd2e651165/release/src/router/rc/services.c#L19047-L19049).
+Guest countdown selectors are only cleared for enabled guest interfaces:
+[guest initialization](https://github.com/RMerl/asuswrt-merlin.ng/blob/f94f6ff8ad96f7366847103e13e69bbd2e651165/release/src/router/rc/lan.c#L5046-L5066).
+Verification therefore requires idle service status for both enables and disables,
+but only enables require idle countdown selectors and countdown-refresh evidence.
 
 ## Recorded hardware verification
 

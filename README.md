@@ -133,12 +133,20 @@ Enabling always starts a fresh router-managed countdown. The request selects
 `_expire_tmp` from `_expire`, even when the duration has not changed. It changes
 only the selected slot's enabled state and duration, not its security or LAN
 access configuration. Changes are serialized until restart completion is
-confirmed, including when disabling. Verification polls only the selected slot
-and restart selectors for up to 60 seconds after applying the change.
+confirmed, including when disabling. Verification polls only the selected slot,
+restart selectors, and `rc_service` for up to 60 seconds after applying the change.
+The service status must be idle; disabled slots may retain their countdown selectors.
 Repeating an enable must show a completed restart or a refreshed countdown;
 already-matching settings alone are not proof. If the restart completes too
 quickly to observe and the timer still looks unchanged, verification may fail
 even though the router applied the change. Check its interface before retrying.
+
+If an apply response is lost or times out, verification can still confirm success;
+the apply request is never automatically resent. An unconfirmed change is retained
+on this `AsusRouter` instance. Subsequent changes first verify that its services have
+finished and do not write new settings while they remain pending. This readiness check
+has its own 60-second deadline and does not require the old countdown to still match
+(it may have expired). Explicit router rejections do not block later changes.
 
 Applying a change restarts wireless/firewall services and may briefly interrupt
 Wi-Fi. Guest Network Pro / SDN is not supported. Run `npm test` for mocked router

@@ -35,8 +35,27 @@ const GUEST_POLL_INTERVAL_MS = 2000;
 // Stock 388 firmware reports countdowns in 30-second steps; allow two steps during apply.
 const GUEST_COUNTDOWN_TOLERANCE_SECONDS = 60;
 
+interface GuestNetworkChange {
+    previous: AsusGuestNetwork;
+    enabled: boolean;
+    durationSeconds: number;
+    previousReadAt: number;
+    restartObserved: boolean;
+    applyError?: unknown;
+}
+
+function isRetryableGuestRequestError(error: unknown): boolean {
+    return !isCancel(error) && isAxiosError(error)
+        && (error.response
+            ? [408, 429, 500, 502, 503, 504].includes(error.response.status)
+            : ['ECONNABORTED', 'ETIMEDOUT', 'ECONNRESET', 'ECONNREFUSED',
+                'EHOSTUNREACH', 'ENETUNREACH', 'EAI_AGAIN', 'ENOTFOUND', 'ERR_NETWORK']
+                .includes(error.code ?? ''));
+}
+
 export class AsusRouter extends AsusClient {
     private guestNetworkChange: Promise<void> = Promise.resolve();
+    private pendingGuestNetworkChange?: GuestNetworkChange;
 
     constructor(ax: AxiosInstance, url: string, mac: string, username: string, password: string, deviceInfo: Device) {
         super(ax, url, mac, username, password, deviceInfo);
@@ -68,12 +87,18 @@ export class AsusRouter extends AsusClient {
         // Radio/slot selectors are shared router state. Serialize changes until
         // the restart has initialized the selected guest network's countdown.
         const operation = this.guestNetworkChange.then(async () => {
+            // A previous write may have applied despite a lost response or failed
+            // verification. Reconcile it before overwriting the shared selectors.
+            await this.confirmPendingGuestNetworkChange(false);
             const networks = await this.getGuestNetworks();
             const previous = networks.find(network => network.id === id);
             if (!previous) {
                 throw new Error('Selected guest network no longer exists or is not configured');
             }
-            const previousReadAt = Date.now();
+            const change: GuestNetworkChange = {
+                previous, enabled, durationSeconds, previousReadAt: Date.now(), restartObserved: false
+            };
+            this.pendingGuestNetworkChange = change;
             const response = await this.customAxRequest({
                 baseURL: this.url,
                 url: '/applyapp.cgi',
@@ -84,17 +109,44 @@ export class AsusRouter extends AsusClient {
                     'Cookie': `asus_token=${this.asusToken}`
                 },
                 data: payload.toString()
+            }).catch(error => {
+                if (isAxiosError(error)
+                    && ((error.response && error.response.status >= 400 && error.response.status < 500
+                        && ![408, 429].includes(error.response.status))
+                        || (!error.request && ['ERR_BAD_OPTION', 'ERR_BAD_OPTION_VALUE', 'ERR_INVALID_URL']
+                            .includes(error.code ?? '')))) {
+                    this.pendingGuestNetworkChange = undefined;
+                }
+                if (!isRetryableGuestRequestError(error)) {
+                    throw error;
+                }
+                // Never resend an apply with an uncertain outcome. Its readback
+                // can still confirm success while keeping queued writes blocked.
+                change.applyError = error;
+                return undefined;
             });
-            if (response.status < 200 || response.status >= 300
-                || !response.data || typeof response.data !== 'object' || Array.isArray(response.data)
-                || response.data.error_status) {
-                throw new Error('Router rejected the guest network change');
+            if (response) {
+                if (response.data && typeof response.data === 'object' && response.data.error_status) {
+                    this.pendingGuestNetworkChange = undefined;
+                    throw new Error('Router rejected the guest network change');
+                }
+                if (response.status < 200 || response.status >= 300
+                    || !response.data || typeof response.data !== 'object' || Array.isArray(response.data)) {
+                    throw new Error('Router rejected the guest network change');
+                }
             }
-            await this.verifyGuestNetworkChange(previous, enabled, durationSeconds, previousReadAt);
+            await this.confirmPendingGuestNetworkChange(true);
             return true;
         });
         this.guestNetworkChange = operation.then(() => undefined, () => undefined);
         return await operation;
+    }
+
+    private async confirmPendingGuestNetworkChange(verifyState: boolean): Promise<void> {
+        if (this.pendingGuestNetworkChange) {
+            await this.verifyGuestNetworkChange(this.pendingGuestNetworkChange, verifyState);
+            this.pendingGuestNetworkChange = undefined;
+        }
     }
 
     private async readGuestNetworkState(id: string, timeout: number) {
@@ -113,18 +165,22 @@ export class AsusRouter extends AsusClient {
         if (typeof data.wl_unit !== 'string' || typeof data.wl_subunit !== 'string') {
             throw new Error('Router did not return guest network restart selectors');
         }
+        if (typeof data.rc_service !== 'string') {
+            throw new Error('Router did not return guest network service status');
+        }
         return {
             ...state,
             restartPending: `wl${data.wl_unit}.${data.wl_subunit}` === id,
-            restartComplete: data.wl_unit === '-1' && data.wl_subunit === '-1'
+            selectorsIdle: data.wl_unit === '-1' && data.wl_subunit === '-1',
+            // Firmware clears rc_service after handling the requested services.
+            // Disabled guest interfaces do not clear their countdown selectors.
+            servicesComplete: data.rc_service === ''
         };
     }
 
-    private async verifyGuestNetworkChange(
-        previous: AsusGuestNetwork, enabled: boolean, durationSeconds: number, previousReadAt: number
-    ): Promise<void> {
+    private async verifyGuestNetworkChange(change: GuestNetworkChange, verifyState: boolean): Promise<void> {
+        const { previous, enabled, durationSeconds, previousReadAt } = change;
         const deadline = Date.now() + GUEST_VERIFICATION_TIMEOUT_MS;
-        let restartObserved = false;
         let lastReadError: unknown;
         while (Date.now() < deadline) {
             const timeout = Math.min(GUEST_READ_TIMEOUT_MS, deadline - Date.now());
@@ -133,8 +189,13 @@ export class AsusRouter extends AsusClient {
             }
             try {
                 const state = await this.readGuestNetworkState(previous.id, timeout);
-                restartObserved ||= state.restartPending;
-                if (state.restartComplete && state.enabled === enabled) {
+                change.restartObserved ||= state.restartPending;
+                // A later operation only needs confirmed service readiness. The
+                // old countdown may have expired since its verification failed.
+                if (state.servicesComplete && !verifyState) {
+                    return;
+                }
+                if (state.servicesComplete && state.enabled === enabled) {
                     if (!enabled) {
                         return;
                     }
@@ -144,24 +205,20 @@ export class AsusRouter extends AsusClient {
                             && remaining >= Math.max(1, durationSeconds - GUEST_COUNTDOWN_TOLERANCE_SECONDS);
                     // An idle selector and matching settings can both be stale.
                     // Require a completed restart or evidence that the timer changed.
-                    const countdownRefreshed = restartObserved || !previous.enabled
+                    const countdownRefreshed = change.restartObserved || !previous.enabled
                         || (remaining !== null && previous.remainingSeconds !== null
                             && (remaining > previous.remainingSeconds
                                 || (durationSeconds === 0 && previous.remainingSeconds > 0)
                                 || previous.remainingSeconds > durationSeconds
                                     + (Date.now() - previousReadAt) / 1000
                                     + GUEST_COUNTDOWN_TOLERANCE_SECONDS));
-                    if (state.durationSeconds === durationSeconds && countdownMatches && countdownRefreshed) {
+                    if (state.selectorsIdle && state.durationSeconds === durationSeconds
+                        && countdownMatches && countdownRefreshed) {
                         return;
                     }
                 }
             } catch (error) {
-                if (isCancel(error) || !isAxiosError(error)
-                    || (error.response
-                        ? ![408, 429, 500, 502, 503, 504].includes(error.response.status)
-                        : !['ECONNABORTED', 'ETIMEDOUT', 'ECONNRESET', 'ECONNREFUSED',
-                            'EHOSTUNREACH', 'ENETUNREACH', 'EAI_AGAIN', 'ENOTFOUND', 'ERR_NETWORK']
-                            .includes(error.code ?? ''))) {
+                if (!isRetryableGuestRequestError(error)) {
                     throw error;
                 }
                 lastReadError = error;
@@ -172,7 +229,8 @@ export class AsusRouter extends AsusClient {
             }
         }
         const detail = lastReadError instanceof Error ? `; last read error: ${lastReadError.message}` : '';
-        throw new Error(`Could not confirm guest network state and countdown; check the ASUS interface${detail}`);
+        const applyDetail = change.applyError instanceof Error ? `; apply error: ${change.applyError.message}` : '';
+        throw new Error(`Could not confirm guest network state and countdown; check the ASUS interface${detail}${applyDetail}`);
     }
 
     /**

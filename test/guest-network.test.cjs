@@ -7,7 +7,7 @@ const { SetGuestNetworkPayload } = require('../lib/models/requests/guest-network
 
 function guestData() {
     return {
-        wl_ifnames: 'eth1 eth2', sdn_rl: '', wl_unit: '-1', wl_subunit: '-1',
+        wl_ifnames: 'eth1 eth2', sdn_rl: '', rc_service: '', wl_unit: '-1', wl_subunit: '-1',
         wl0_nband: '2', wl0_vifnames: 'wl0.1 wl0.2 wl0.3',
         wl1_nband: '1', wl1_vifnames: 'wl1.1 wl1.2 wl1.3',
         'wl0.1_ssid': 'Visitors', 'wl0.1_mbss': '1', 'wl0.1_bss_enabled': '1',
@@ -45,6 +45,7 @@ async function fakeRouter(options = {}) {
         } else if (config.url === '/applyapp.cgi') {
             const payload = new URLSearchParams(config.data);
             writes.push(payload);
+            data.rc_service = payload.get('rc_service');
             data.wl_unit = payload.get('wl_unit');
             data.wl_subunit = payload.get('wl_subunit');
             if (options.onApply) await options.onApply(payload);
@@ -58,9 +59,14 @@ async function fakeRouter(options = {}) {
                 }
             }
             if (options.restartFinished !== false) {
-                data.wl_unit = '-1';
-                data.wl_subunit = '-1';
+                data.rc_service = '';
+                // Classic firmware only consumes selectors for enabled guests.
+                if (payload.get(`wl${data.wl_unit}.${data.wl_subunit}_bss_enabled`) === '1') {
+                    data.wl_unit = '-1';
+                    data.wl_subunit = '-1';
+                }
             }
+            if (options.onApplied) await options.onApplied({ data, writes, payload });
             body = options.response ?? { modify: '1' };
         } else {
             throw new Error(`Unexpected request ${config.url}`);
@@ -156,6 +162,7 @@ test('timed enable authenticates the write to the correct router and reads back 
     const reads = requests.filter(request => request.url === '/appGet.cgi');
     assert.equal(reads.length, 3); // metadata, discovery, then one selected-slot verification
     const verificationHook = new URLSearchParams(reads[2].data).get('hook');
+    assert.match(verificationHook, /nvram_get\(rc_service\)/);
     assert.match(verificationHook, /nvram_get\(wl_unit\)/);
     assert.match(verificationHook, /nvram_get\(wl0\.1_expire_tmp\)/);
     assert.doesNotMatch(verificationHook, /wl_ifnames|wl1\.|wl0\.2/);
@@ -171,6 +178,23 @@ test('unlimited enable clears the countdown; disable preserves configured durati
     await router.setGuestNetworkEnabled('wl0.1', false);
     assert.equal(data['wl0.1_bss_enabled'], '0');
     assert.equal(data['wl0.1_expire'], '300');
+    assert.equal(data.wl_unit, '0');
+    assert.equal(data.wl_subunit, '1');
+    assert.equal(data.rc_service, '');
+});
+
+test('confirms an already-disabled network without requiring idle countdown selectors', async () => {
+    const { router, data, writes } = await fakeRouter();
+    assert.equal(await router.setGuestNetworkEnabled('wl1.1', false), true);
+    assert.equal(data.wl_unit, '1');
+    assert.equal(data.wl_subunit, '1');
+    assert.equal(writes.length, 1);
+});
+
+test('does not confirm a disable when the router leaves the selected network enabled', async t => {
+    immediatePolling(t);
+    const { router } = await fakeRouter({ apply: false });
+    await assert.rejects(router.setGuestNetworkEnabled('wl0.1', false), /Could not confirm/);
 });
 
 test('refuses a missing or unconfigured target without applying changes', async () => {
@@ -230,6 +254,7 @@ test('confirms repeated unlimited enable by observing restart selectors become i
     let reads = 0;
     const { router, data } = await fakeRouter({ restartFinished: false, onRead: ({ data }) => {
         if (++reads === 2) {
+            data.rc_service = '';
             data.wl_unit = '-1';
             data.wl_subunit = '-1';
         }
@@ -314,8 +339,14 @@ test('a disable keeps the cross-radio queue locked until its restart completes',
             await gate;
         }
         if (reads >= 2) {
-            data.wl_unit = '-1';
-            data.wl_subunit = '-1';
+            data.rc_service = '';
+            if (writes.length > 1) {
+                data.wl_unit = '-1';
+                data.wl_subunit = '-1';
+            } else {
+                assert.equal(data.wl_unit, '0');
+                assert.equal(data.wl_subunit, '1');
+            }
         }
     }});
     const first = router.setGuestNetworkEnabled('wl0.1', false);
@@ -326,6 +357,163 @@ test('a disable keeps the cross-radio queue locked until its restart completes',
     release();
     assert.deepEqual(await Promise.all([first, second]), [true, true]);
     assert.equal(writes.length, 2);
+});
+
+test('waits for services even if an enable has already consumed its countdown selectors', async t => {
+    immediatePolling(t);
+    let reads = 0;
+    const { router } = await fakeRouter({ restartFinished: false, onRead: ({ data }) => {
+        data.wl_unit = '-1';
+        data.wl_subunit = '-1';
+        if (++reads === 3) data.rc_service = '';
+    }});
+    assert.equal(await router.setGuestNetworkEnabled('wl0.1', true, 120), true);
+    assert.equal(reads, 3);
+});
+
+test('reconciles an accepted apply with a lost response before allowing the next write', async t => {
+    immediatePolling(t);
+    let announce;
+    let release;
+    const verificationStarted = new Promise(resolve => { announce = resolve; });
+    const gate = new Promise(resolve => { release = resolve; });
+    const { router, writes, data } = await fakeRouter({ restartFinished: false,
+        onApplied: ({ writes }) => {
+            if (writes.length === 1) throw new axios.AxiosError('apply response lost', 'ECONNRESET');
+        },
+        onRead: async ({ data, writes }) => {
+            if (writes.length === 1 && data.rc_service !== '') {
+                announce();
+                await gate;
+                assert.equal(data.wl_unit, '0');
+                assert.equal(data.wl_subunit, '1');
+            }
+            data.rc_service = '';
+            data.wl_unit = '-1';
+            data.wl_subunit = '-1';
+        }
+    });
+    const first = router.setGuestNetworkEnabled('wl0.1', true, 120);
+    await verificationStarted;
+    const second = router.setGuestNetworkEnabled('wl1.1', true, 300);
+    await new Promise(resolve => setImmediate(resolve));
+    assert.equal(writes.length, 1);
+    release();
+    assert.deepEqual(await Promise.all([first, second]), [true, true]);
+    assert.equal(writes.length, 2);
+    assert.equal(data['wl0.1_expire_tmp'], '120');
+    assert.equal(data['wl1.1_expire_tmp'], '300');
+});
+
+test('an unresolved apply timeout blocks later writes and can be reconciled without resending', async t => {
+    immediatePolling(t);
+    const { router, writes, data } = await fakeRouter({ restartFinished: false,
+        onApplied: ({ writes }) => {
+            if (writes.length === 1) throw new axios.AxiosError('apply timed out', 'ETIMEDOUT');
+        },
+        onRead: ({ data, writes }) => {
+            if (writes.length > 1) data.rc_service = '';
+        }
+    });
+    data['wl0.1_expire'] = '0';
+    data['wl0.1_expire_tmp'] = '0';
+    await assert.rejects(router.setGuestNetworkEnabled('wl0.1', true), /apply error: apply timed out/);
+    await assert.rejects(router.setGuestNetworkEnabled('wl1.1', true, 300), /Could not confirm/);
+    assert.equal(writes.length, 1);
+    assert.equal(data.wl_unit, '0');
+    // The old restart eventually completes. Service readiness allows another
+    // write even when confirming the original settings is no longer possible.
+    data.rc_service = '';
+    data.wl_unit = '-1';
+    data.wl_subunit = '-1';
+    data['wl0.1_bss_enabled'] = '0';
+    assert.equal(await router.setGuestNetworkEnabled('wl1.1', false), true);
+    assert.equal(writes.length, 2);
+});
+
+test('an unconfirmed countdown does not block later changes once services are idle', async t => {
+    immediatePolling(t);
+    const { router, writes, data } = await fakeRouter({ resetCountdown: false });
+    await assert.rejects(router.setGuestNetworkEnabled('wl0.1', true, 600), /Could not confirm/);
+    assert.equal(data.rc_service, '');
+    assert.equal(await router.setGuestNetworkEnabled('wl1.1', false), true);
+    assert.equal(writes.length, 2);
+});
+
+test('failed verification after an acknowledgement also prevents selector overwrite', async t => {
+    immediatePolling(t);
+    const { router, writes, data } = await fakeRouter({ restartFinished: false,
+        onRead: ({ data, writes }) => {
+            if (writes.length > 1) data.rc_service = '';
+        }
+    });
+    await assert.rejects(router.setGuestNetworkEnabled('wl0.1', false), /Could not confirm/);
+    await assert.rejects(router.setGuestNetworkEnabled('wl1.1', true, 300), /Could not confirm/);
+    assert.equal(writes.length, 1);
+    data.rc_service = '';
+    assert.equal(await router.setGuestNetworkEnabled('wl1.1', false), true);
+    assert.equal(writes.length, 2);
+});
+
+test('explicit apply rejections do not prevent a later valid change', async () => {
+    const { router, writes } = await fakeRouter({ onApplied: ({ writes }) => {
+        if (writes.length === 1) {
+            throw new axios.AxiosError('Forbidden', 'ERR_BAD_REQUEST', undefined, undefined, { status: 403 });
+        }
+    }});
+    await assert.rejects(router.setGuestNetworkEnabled('wl0.1', true, 120), /Forbidden/);
+    assert.equal(await router.setGuestNetworkEnabled('wl1.1', true, 300), true);
+    assert.equal(writes.length, 2);
+});
+
+test('router error responses release the queue for later changes', async () => {
+    const response = { error_status: '2' };
+    const { router, writes } = await fakeRouter({ response });
+    await assert.rejects(router.setGuestNetworkEnabled('wl0.1', true, 120), /rejected/);
+    delete response.error_status;
+    assert.equal(await router.setGuestNetworkEnabled('wl1.1', true, 300), true);
+    assert.equal(writes.length, 2);
+});
+
+test('local apply setup failures release the queue without attempting reconciliation', async t => {
+    const { router, writes } = await fakeRouter();
+    const request = router.customAxRequest.bind(router);
+    let fail = true;
+    t.mock.method(router, 'customAxRequest', async config => {
+        if (config.url === '/applyapp.cgi' && fail) {
+            fail = false;
+            throw new axios.AxiosError('Invalid option', 'ERR_BAD_OPTION_VALUE');
+        }
+        return request(config);
+    });
+    await assert.rejects(router.setGuestNetworkEnabled('wl0.1', true, 120), /Invalid option/);
+    assert.equal(writes.length, 0);
+    assert.equal(await router.setGuestNetworkEnabled('wl1.1', true, 300), true);
+    assert.equal(writes.length, 1);
+});
+
+test('cancellation after applying preserves the uncertain change for the next operation', async t => {
+    immediatePolling(t);
+    const error = new axios.CanceledError('disposed during apply');
+    const { router, writes, data } = await fakeRouter({ restartFinished: false,
+        onApplied: ({ writes }) => {
+            if (writes.length === 1) throw error;
+        },
+        onRead: ({ data, writes }) => {
+            if (writes.length > 1) data.rc_service = '';
+        }
+    });
+    await assert.rejects(router.setGuestNetworkEnabled('wl0.1', false), value => value === error);
+    await assert.rejects(router.setGuestNetworkEnabled('wl1.1', true, 300), /Could not confirm/);
+    assert.equal(writes.length, 1);
+    data.rc_service = '';
+    assert.equal(await router.setGuestNetworkEnabled('wl1.1', false), true);
+    assert.equal(writes.length, 2);
+});
+
+test('rejects malformed service status instead of accepting matching disable settings', async () => {
+    const { router } = await fakeRouter({ onRead: ({ data }) => { data.rc_service = 0; } });
+    await assert.rejects(router.setGuestNetworkEnabled('wl0.1', false), /service status/);
 });
 
 test('serializes overlapping changes across radios until the first change is verified', async () => {
