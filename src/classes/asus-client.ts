@@ -56,13 +56,14 @@ export class AsusClient {
         return loginResult.data;
     }
 
-    async appGet<T, TT>(payload: AppGetPayloads, appGetTransformer?: AppGetTransformer<T, TT>): Promise<TT> {
+    async appGet<T, TT>(payload: AppGetPayloads | string, appGetTransformer?: AppGetTransformer<T, TT>, timeout?: number): Promise<TT> {
         const path = '/appGet.cgi';
         try {
             const response = await this.axios.request({
                 baseURL: this.url,
                 url: path,
                 method: 'POST',
+                timeout,
                 data: new URLSearchParams({
                     hook: payload
                 }),

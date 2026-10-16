@@ -107,3 +107,52 @@ These methods are also available on the AsusRouter
 - `getWakeOnLanDevices()`: Retrieves devices that can be woken up using Wake-on-LAN.
 - `getOoklaServers()`: Gets Ookla speed test servers.
 - `runSpeedtest(server)`: Runs a speed test using the specified Ookla server.
+
+### Classic guest Wi-Fi
+
+`getGuestNetworks()` lists previously configured classic guest slots (1–3) on
+2.4/5 GHz radios, including disabled networks. Each entry has a stable `id`
+(e.g. `wl0.1`), SSID, band, enabled state, configured duration and remaining
+seconds. Wi-Fi passwords are not requested or returned. Configure the SSID,
+password and isolation in the ASUS interface before using these methods.
+Discovery returns an empty array if no classic guest slots are configured.
+
+```typescript
+const guests = await router.getGuestNetworks();
+const guest = guests.find(network => network.ssid === 'Visitors' && network.band === '2.4 GHz');
+if (!guest) throw new Error('Guest network not found');
+
+await router.setGuestNetworkEnabled(guest.id, true, 4 * 60 * 60); // four hours
+await router.setGuestNetworkEnabled(guest.id, true);             // unlimited
+await router.setGuestNetworkEnabled(guest.id, false);            // disable
+```
+
+The duration is an integer in seconds from 0 (unlimited) to 2592000 (30 days).
+Enabling always starts a fresh router-managed countdown. The request selects
+`wl_unit`/`wl_subunit` so the wireless restart initializes that slot's
+`_expire_tmp` from `_expire`, even when the duration has not changed. It changes
+only the selected slot's enabled state and duration, not its security or LAN
+access configuration. Changes are serialized until restart completion is
+confirmed, including when disabling. Verification polls only the selected slot,
+restart selectors, and `rc_service` for up to 60 seconds after applying the change.
+The service status must be idle; disabled slots may retain their countdown selectors.
+Repeating an enable must show a completed restart or a refreshed countdown;
+already-matching settings alone are not proof. If the restart completes too
+quickly to observe and the timer still looks unchanged, verification may fail
+even though the router applied the change. Check its interface before retrying.
+
+If an apply response is lost or times out, verification can still confirm success;
+the apply request is never automatically resent. An unconfirmed change is retained
+on this `AsusRouter` instance. Subsequent changes first verify that its services have
+finished and do not write new settings while they remain pending. This readiness check
+has its own 60-second deadline and does not require the old countdown to still match
+(it may have expired). Explicit router rejections do not block later changes.
+
+Applying a change restarts wireless/firewall services and may briefly interrupt
+Wi-Fi. Guest Network Pro / SDN is not supported. Run `npm test` for mocked router
+protocol checks.
+
+Hardware checks used one **RT-AX88U**, stock **3.0.0.4.388_24385**. Its timer
+reports 30-second steps, so access duration is not a precision timer.
+See [development notes](DEVELOPMENT.md) for recorded checks and coverage limits.
+The verification refactor has automated coverage; it has not been retested on hardware.

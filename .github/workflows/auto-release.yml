@@ -34,6 +34,9 @@ jobs:
       - name: Install
         run: npm ci
 
+      - name: Test
+        run: npm test
+
       - name: Bump minor version (patch=0), commit, and tag
         shell: bash
         run: |
