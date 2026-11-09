@@ -8,6 +8,7 @@ import { AppGetPayloads } from "./models/requests/app-get-payloads";
 import * as https from "node:https";
 import { AsusConnectedDevice, ConnectionMethod } from "./models/asus-connected-device";
 import {userAgent} from "./constants";
+export { AsusLoginError } from "./classes/asus-login-error";
 
 export class AsusWrt {
     public asusRouter: AsusRouter | undefined = undefined;
@@ -124,6 +125,23 @@ export class AsusWrt {
                     }
                     client.connectedDevices.push(this.mapClientToAsusClient(clientEntry, connectionType));
                 });
+            });
+        });
+    }
+
+    /**
+     * Re-fetches the cfg client list and refreshes `deviceInfo` on the already discovered clients
+     * (matched by MAC), so values like `fwver` / `newfwver` stay current without re-creating clients.
+     *
+     * @return {Promise<void>} A promise that resolves when the device info has been refreshed.
+     */
+    public async updateDeviceInfo(): Promise<void> {
+        await this.mainClient!.appGet<getCfgClientList, void>(AppGetPayloads.CfgClientList, (response) => {
+            response.get_cfg_clientlist.forEach((deviceInfo) => {
+                const client = this.allClients.find((c) => c.mac === deviceInfo.mac);
+                if (client) {
+                    client.deviceInfo = deviceInfo;
+                }
             });
         });
     }

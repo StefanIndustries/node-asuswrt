@@ -97,6 +97,7 @@ These methods are also available on the AsusRouter
 - `reboot()`: Reboots the client.
 - `getCPUMemoryLoad()`: Retrieves CPU and memory load.
 - `getUptimeSeconds()`: Retrieves uptime in seconds.
+- `getTemperatures()`: Retrieves CPU and Wi-Fi radio temperatures in °C (returns `{}` on models without sensors).
 - `connectedDevices`: Lists connected devices.
 
 #### `AsusRouter` Methods
@@ -107,6 +108,11 @@ These methods are also available on the AsusRouter
 - `getWakeOnLanDevices()`: Retrieves devices that can be woken up using Wake-on-LAN.
 - `getOoklaServers()`: Gets Ookla speed test servers.
 - `runSpeedtest(server)`: Runs a speed test using the specified Ookla server.
+- `getFirmwareInfo()`: Gets the installed firmware version, model and whether a firmware update is available.
+- `getEthernetPorts()`: Gets the link state and negotiated speed (Mbit/s) of each Ethernet port.
+- `getWirelessChannels()`: Gets the current control channel and band of each Wi-Fi radio.
+- `getDhcpLeases()`: Gets the active DHCP leases (MAC address and hostname).
+- `getPublicIp()`: Gets the WAN IP and detected public IP, and whether the router is behind another NAT (e.g. CGNAT).
 
 ### Classic guest Wi-Fi
 

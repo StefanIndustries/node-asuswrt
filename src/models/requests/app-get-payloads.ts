@@ -10,4 +10,9 @@ export enum AppGetPayloads {
     OoklaSpeedtestHistory = 'ookla_speedtest_get_history()',
     OoklaSpeedtestResult = 'ookla_speedtest_get_result()',
     ClientList = 'get_clientlist();get_wiredclientlist();get_wclientlist();',
+    FirmwareInfo = 'nvram_get(firmver);nvram_get(buildno);nvram_get(extendno);nvram_get(productid);nvram_get(odmpid);nvram_get(webs_state_flag);nvram_get(webs_state_info);',
+    EthernetPorts = 'get_wan_lan_status()',
+    WirelessChannels = 'wl_control_channel();nvram_get(wl_ifnames);nvram_get(wl0_nband);nvram_get(wl1_nband);nvram_get(wl2_nband);nvram_get(wl3_nband);',
+    DhcpLeases = 'dhcpLeaseMacList()',
+    PublicIp = 'get_wan_unit();nvram_get(wan0_ipaddr);nvram_get(wan0_realip_state);nvram_get(wan0_realip_ip);nvram_get(wan1_ipaddr);nvram_get(wan1_realip_state);nvram_get(wan1_realip_ip);',
 }

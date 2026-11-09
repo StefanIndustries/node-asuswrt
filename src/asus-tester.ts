@@ -4,6 +4,7 @@ import { AsusOptions } from "./asus-options";
 import {userAgent} from "./constants";
 import {LoginResult} from "./models/responses/login-result";
 import {URLSearchParams} from "node:url";
+import {AsusLoginError} from "./classes/asus-login-error";
 
 /**
  * A utility class to debug and validate Asus Router connections, credentials, and setup.
@@ -58,9 +59,13 @@ export class AsusTester {
             }
 
             // Step 3: Test username and password authentication.
-            result.isAuthValid = await this.validateAuthentication();
-            if (!result.isAuthValid) {
-                result.message = "Authentication failed. Check username and password.";
+            const loginError = await this.validateAuthentication();
+            result.isAuthValid = loginError === undefined;
+            if (loginError) {
+                result.isLocked = loginError instanceof AsusLoginError && loginError.isLocked;
+                result.message = result.isLocked
+                    ? loginError.message
+                    : "Authentication failed. Check username and password.";
                 return result;
             }
 
@@ -109,9 +114,10 @@ export class AsusTester {
 
     /**
      * Test the username and password for authentication.
-     * @returns {Promise<boolean>} True if authentication is successful.
+     * @returns {Promise<Error | undefined>} undefined if authentication succeeds, otherwise the reason it failed
+     *          (an {@link AsusLoginError} when the router rejected the login, e.g. because it is temporarily locked).
      */
-    private async validateAuthentication(): Promise<boolean> {
+    private async validateAuthentication(): Promise<Error | undefined> {
         if (this.disposed) {
             throw new Error("Cannot validate authentication after the tester has been disposed.")
         }
@@ -129,9 +135,14 @@ export class AsusTester {
                     'Content-Type': 'application/x-www-form-urlencoded'
                 }
             });
-            return response.status === 200 && response.data.asus_token !== undefined && !response.data.error_status;
-        } catch {
-            return false;
+            if (response.status === 200 && response.data.error_status) {
+                return new AsusLoginError(response.data);
+            }
+            return response.status === 200 && response.data.asus_token !== undefined
+                ? undefined
+                : new Error('Router did not return a login token');
+        } catch (error) {
+            return error instanceof Error ? error : new Error(String(error));
         }
     }
 
@@ -158,5 +169,7 @@ export interface DebugResult {
     isUrlValid: boolean;
     canConnect: boolean;
     isAuthValid: boolean;
+    /** True when the router is temporarily blocking logins after too many failed attempts. */
+    isLocked?: boolean;
     message: string;
 }

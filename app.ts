@@ -10,7 +10,7 @@ async function main() {
         baseURL: url,
         username: username,
         password: password,
-        isSelfSignedCertificate: true,
+        isSelfSignedCertificate: true
     }
 
     const asusTester = new AsusTester(options);

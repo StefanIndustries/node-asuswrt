@@ -11,6 +11,9 @@ import { uptimeTransformer } from "../transformers/uptime-transformer";
 import { RebootNodePayload, SetLedsPayload } from "../models/requests/apply-app-payloads";
 import { AsusConnectedDevice } from "../models/asus-connected-device";
 import { Device } from "../models/responses/get-cfg-clientlist";
+import { AsusLoginError } from "./asus-login-error";
+import { AsusTemperatures } from "../models/asus-router-info";
+import { temperaturesTransformer } from "../transformers/router-info-transformers";
 
 export class AsusClient {
     public asusToken: string = '';
@@ -50,7 +53,7 @@ export class AsusClient {
             }
         });
         if (loginResult.data.error_status) {
-            throw new Error(loginResult.data.error_status);
+            throw new AsusLoginError(loginResult.data);
         }
         this.asusToken = loginResult.data.asus_token;
         return loginResult.data;
@@ -115,6 +118,30 @@ export class AsusClient {
      */
     async getUptimeSeconds(): Promise<number> {
         return await this.appGet<Uptime, number>(AppGetPayloads.Uptime, uptimeTransformer);
+    }
+
+    /**
+     * Retrieves the CPU and Wi-Fi radio temperatures in °C (the web UI's Temperature page).
+     * Works on the router and on AiMesh nodes; sensors the model lacks are omitted.
+     *
+     * @return {Promise<AsusTemperatures>} A promise that resolves with the available temperatures.
+     */
+    async getTemperatures(): Promise<AsusTemperatures> {
+        const request = () => this.axios.request({
+            baseURL: this.url,
+            url: '/ajax_coretmp.asp',
+            method: 'GET',
+            responseType: 'text',
+            transformResponse: (data: unknown) => data,
+            headers: { 'Cookie': `asus_token=${this.asusToken}` }
+        });
+        let response = await request();
+        // An expired session returns the login page instead of the script.
+        if (typeof response.data === 'string' && /Main_Login\.asp|login\.cgi/i.test(response.data)) {
+            await this.authenticate();
+            response = await request();
+        }
+        return temperaturesTransformer(response.data);
     }
 
     /**

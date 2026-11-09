@@ -28,6 +28,13 @@ import {
     guestNetworkRadioCount, guestNetworksTransformer, guestNetworkStateTransformer
 } from "../transformers/guest-networks-transformer";
 
+import {
+    AsusDhcpLease, AsusEthernetPort, AsusFirmwareInfo, AsusPublicIpInfo, AsusWirelessChannel
+} from "../models/asus-router-info";
+import {
+    dhcpLeasesTransformer, ethernetPortsTransformer, firmwareInfoTransformer, publicIpTransformer, wirelessChannelsTransformer
+} from "../transformers/router-info-transformers";
+
 const GUEST_READ_TIMEOUT_MS = 10000;
 const GUEST_APPLY_TIMEOUT_MS = 15000;
 const GUEST_VERIFICATION_TIMEOUT_MS = 60000;
@@ -249,6 +256,51 @@ export class AsusRouter extends AsusClient {
      */
     async getWANStatus(): Promise<AsusWanLinkStatus> {
         return await this.appGet<string, AsusWanLinkStatus>(AppGetPayloads.WANStatus, wanLinkTransformer);
+    }
+
+    /**
+     * Retrieves the installed firmware version, model, and the result of the router's last firmware update check.
+     *
+     * @return {Promise<AsusFirmwareInfo>} A promise that resolves with the firmware information.
+     */
+    async getFirmwareInfo(): Promise<AsusFirmwareInfo> {
+        return await this.appGet<unknown, AsusFirmwareInfo>(AppGetPayloads.FirmwareInfo, firmwareInfoTransformer);
+    }
+
+    /**
+     * Retrieves the link state and negotiated speed of the router's Ethernet ports.
+     *
+     * @return {Promise<AsusEthernetPort[]>} A promise that resolves with one entry per physical port.
+     */
+    async getEthernetPorts(): Promise<AsusEthernetPort[]> {
+        return await this.appGet<unknown, AsusEthernetPort[]>(AppGetPayloads.EthernetPorts, ethernetPortsTransformer);
+    }
+
+    /**
+     * Retrieves the current control channel of each Wi-Fi radio.
+     *
+     * @return {Promise<AsusWirelessChannel[]>} A promise that resolves with one entry per radio.
+     */
+    async getWirelessChannels(): Promise<AsusWirelessChannel[]> {
+        return await this.appGet<unknown, AsusWirelessChannel[]>(AppGetPayloads.WirelessChannels, wirelessChannelsTransformer);
+    }
+
+    /**
+     * Retrieves the router's active DHCP leases (MAC address and hostname).
+     *
+     * @return {Promise<AsusDhcpLease[]>} A promise that resolves with the DHCP leases.
+     */
+    async getDhcpLeases(): Promise<AsusDhcpLease[]> {
+        return await this.appGet<unknown, AsusDhcpLease[]>(AppGetPayloads.DhcpLeases, dhcpLeasesTransformer);
+    }
+
+    /**
+     * Retrieves the WAN IP and the public IP the router detected, which shows whether the router is behind another NAT (e.g. CGNAT).
+     *
+     * @return {Promise<AsusPublicIpInfo>} A promise that resolves with the IP information of the active WAN.
+     */
+    async getPublicIp(): Promise<AsusPublicIpInfo> {
+        return await this.appGet<unknown, AsusPublicIpInfo>(AppGetPayloads.PublicIp, publicIpTransformer);
     }
 
     /**
