@@ -66,10 +66,9 @@ export class AsusRouter extends AsusClient {
 
     constructor(ax: AxiosInstance, url: string, mac: string, username: string, password: string, deviceInfo: Device) {
         super(ax, url, mac, username, password, deviceInfo);
-        super.authenticate().then(() => {
-        }).catch((e) => {
-            throw new Error(e);
-        });
+        // Rethrowing here would be an unhandled rejection (and crash the host process).
+        // Requests re-authenticate on demand, so a failed initial login is not fatal.
+        super.authenticate().catch(() => undefined);
     }
 
     /** Lists previously configured classic 2.4/5 GHz guest networks, including disabled ones. */
@@ -415,6 +414,7 @@ export class AsusRouter extends AsusClient {
             baseURL: this.url,
             url: '/set_ookla_speedtest_start_time.cgi',
             method: 'POST',
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded', 'Cookie': `asus_token=${this.asusToken}` },
             data: new URLSearchParams({
                 ookla_start_time: Date.now().toString()
             })
@@ -427,6 +427,7 @@ export class AsusRouter extends AsusClient {
             baseURL: this.url,
             url: `/ookla_speedtest_exe.cgi`,
             method: 'POST',
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded', 'Cookie': `asus_token=${this.asusToken}` },
             data: new URLSearchParams({
                 type: '',
                 id: `${ooklaServer.id}`
@@ -440,7 +441,9 @@ export class AsusRouter extends AsusClient {
         while (nRetrieveResultAttempts < 30) {
             nRetrieveResultAttempts++;
             const data = await this.appGet<any, any>(AppGetPayloads.OoklaSpeedtestResult, (data: any) => data);
-            const resultFound: AsusOoklaSpeedtestResult = data.ookla_speedtest_get_result.find((element: any) => element.type === 'result');
+            // The router may return a partial/invalid file while the test is still writing it.
+            const progress = data && Array.isArray(data.ookla_speedtest_get_result) ? data.ookla_speedtest_get_result : [];
+            const resultFound: AsusOoklaSpeedtestResult | undefined = progress.find((element: any) => element && element.type === 'result');
             if (resultFound) {
                 return resultFound;
             }
@@ -455,9 +458,10 @@ export class AsusRouter extends AsusClient {
         const uglyJsonString = history.length > 0 ? `${resultString}\n${rebuiltHistory}` : resultString;
         const requestBody = new URLSearchParams({speedTest_history: uglyJsonString});
         const response = await this.customAxRequest({
+            baseURL: this.url,
             url: '/ookla_speedtest_write_history.cgi',
             method: 'POST',
-            headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+            headers: {'Content-Type': 'application/x-www-form-urlencoded', 'Cookie': `asus_token=${this.asusToken}`},
             data: requestBody
         });
         return response.status >= 200 && response.status < 300;

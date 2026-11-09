@@ -31,15 +31,37 @@ export class AsusWrt {
         });
 
         this.ax.interceptors.response.use(async (response) => {
-            if (response.config.url !== '/login.cgi' && response.data && response.data.error_status) {
-                const client = this.allClients.find((client) => client.url === response.config.baseURL);
-                await client?.authenticate();
-                delete response.config.headers!['Cookie'];
-                response.config.headers!['Cookie'] = `asus_token=${client?.asusToken}`;
-                return this.ax.request(response.config);
+            const config = response.config as typeof response.config & { asusAuthRetried?: boolean };
+            if (config.url === '/login.cgi' || config.asusAuthRetried
+                || !response.data || typeof response.data !== 'object' || !response.data.error_status) {
+                return response;
             }
-            return response;
+            // Re-authenticate and retry once. Without a matching client (or when the retry is
+            // rejected again) hand the response back instead of re-requesting it forever.
+            const client = this.findClientByUrl(config.baseURL);
+            if (!client) {
+                return response;
+            }
+            await client.authenticate();
+            config.asusAuthRetried = true;
+            delete config.headers['Cookie'];
+            config.headers['Cookie'] = `asus_token=${client.asusToken}`;
+            return this.ax.request(config);
         });
+    }
+
+    /** Finds the client a request was sent to; compares origins so "http://host:80" matches "http://host". */
+    private findClientByUrl(url: string | undefined): AsusClient | undefined {
+        const origin = (value: string | undefined) => {
+            try {
+                return new URL(value ?? '').origin;
+            } catch {
+                return value;
+            }
+        };
+        const target = origin(url ?? this.options.baseURL);
+        return this.allClients.find((client) => origin(client.url) === target)
+            ?? (this.mainClient && origin(this.mainClient.url) === target ? this.mainClient : undefined);
     }
 
     /**
